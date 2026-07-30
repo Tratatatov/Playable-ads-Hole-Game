@@ -1,0 +1,93 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "e2a938ae-625f-42a6-ab0e-37af39c2a06d",
+  "files": [],
+  "subMetas": {
+    "ee5b6": {
+      "importer": "gltf-mesh",
+      "uuid": "e2a938ae-625f-42a6-ab0e-37af39c2a06d@ee5b6",
+      "displayName": "",
+      "id": "ee5b6",
+      "name": "BezierCurve.001.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 730
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "862e8": {
+      "importer": "gltf-material",
+      "uuid": "e2a938ae-625f-42a6-ab0e-37af39c2a06d@862e8",
+      "displayName": "",
+      "id": "862e8",
+      "name": "Grey.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "686a2": {
+      "importer": "gltf-scene",
+      "uuid": "e2a938ae-625f-42a6-ab0e-37af39c2a06d@686a2",
+      "displayName": "",
+      "id": "686a2",
+      "name": "Wall.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "e2a938ae-625f-42a6-ab0e-37af39c2a06d@ee5b6"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [
+        "e2a938ae-625f-42a6-ab0e-37af39c2a06d@862e8"
+      ],
+      "scenes": [
+        "e2a938ae-625f-42a6-ab0e-37af39c2a06d@686a2"
+      ]
+    }
+  }
+}

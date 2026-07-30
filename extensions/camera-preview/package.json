@@ -1,0 +1,58 @@
+{
+  "package_version": 2,
+  "version": "1.0.0",
+  "name": "camera-preview",
+  "description": "Live camera preview panel — always visible, resizable, with aspect-ratio lock",
+  "author": "Antigravity",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "panels": {
+    "default": {
+      "title": "Camera Preview",
+      "type": "dockable",
+      "main": "dist/panel.js",
+      "size": {
+        "width": 480,
+        "height": 300,
+        "min-width": 200,
+        "min-height": 120
+      }
+    }
+  },
+  "contributions": {
+    "menu": [
+      {
+        "path": "i18n:menu.panel/Camera Preview",
+        "label": "Camera Preview",
+        "message": "camera-preview:open-panel"
+      }
+    ],
+    "messages": {
+      "camera-preview:open-panel": {
+        "methods": ["main.openPanel"]
+      },
+      "camera-preview:capture-frame": {
+        "methods": ["main.captureFrame"]
+      },
+      "camera-preview:list-cameras": {
+        "methods": ["main.listCameras"]
+      },
+      "camera-preview:frame-data": {
+        "methods": ["default.onFrameData"]
+      },
+      "camera-preview:cameras-list": {
+        "methods": ["default.onCamerasList"]
+      }
+    },
+    "scene": {
+      "script": "dist/scene.js"
+    }
+  }
+}
