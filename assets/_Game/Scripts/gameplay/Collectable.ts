@@ -42,7 +42,7 @@ export class Collectable extends Component {
     }
 
     /** Вызывается HoleController при коллизии */
-    collect(): void {
+    collect(holeNode?: Node): void {
         if (this._collected) return;
         this._collected = true;
         // Добавляем очки в GameStore (он сам эмитит SCORE_CHANGED)
@@ -51,13 +51,58 @@ export class Collectable extends Component {
             score:      this.scoreValue,
             totalScore: GameStore.score,
         });
-        // Твин падения
-        const pos = this.node.position;
-        tween(this.node)
-            .to(LEVEL_CONFIG.fallAnimTime, {
-                position: new Vec3(pos.x, LEVEL_CONFIG.fallAnimDepth, pos.z),
-                scale: new Vec3(LEVEL_CONFIG.fallAnimScale, LEVEL_CONFIG.fallAnimScale, LEVEL_CONFIG.fallAnimScale)
-            }, { easing: 'quadIn' })
+
+        const startPos = this.node.worldPosition.clone();
+        const startScale = this.node.worldScale.clone();
+
+        const animObj = { progress: 0 };
+        const tempPos = new Vec3();
+        const tempScale = new Vec3();
+        let peakPos = new Vec3();
+
+        // Твин с динамическим отслеживанием (homing) текущей позиции дыры
+        tween(animObj)
+            // 1. Подпрыгивание (навстречу текущему положению дыры)
+            .to(LEVEL_CONFIG.jumpAnimTime, { progress: 1 }, { 
+                easing: 'quadOut',
+                onUpdate: (target: any) => {
+                    const r = target.progress;
+                    const hPos = holeNode ? holeNode.worldPosition : startPos;
+                    const midX = startPos.x + (hPos.x - startPos.x) * 0.5;
+                    const midZ = startPos.z + (hPos.z - startPos.z) * 0.5;
+                    
+                    tempPos.x = startPos.x + (midX - startPos.x) * r;
+                    tempPos.y = startPos.y + (LEVEL_CONFIG.jumpAnimHeight) * r;
+                    tempPos.z = startPos.z + (midZ - startPos.z) * r;
+                    
+                    this.node.setWorldPosition(tempPos);
+                }
+            })
+            .call(() => { 
+                animObj.progress = 0; 
+                peakPos.set(this.node.worldPosition);
+            })
+            // 2. Падение (точно в центр движущейся дыры)
+            .to(LEVEL_CONFIG.fallAnimTime, { progress: 1 }, { 
+                easing: 'quadIn',
+                onUpdate: (target: any) => {
+                    const r = target.progress;
+                    const hPos = holeNode ? holeNode.worldPosition : startPos;
+                    
+                    // Целевая высота (fallAnimDepth) применяется относительно стартовой Y
+                    const targetY = startPos.y + LEVEL_CONFIG.fallAnimDepth;
+
+                    tempPos.x = peakPos.x + (hPos.x - peakPos.x) * r;
+                    tempPos.y = peakPos.y + (targetY - peakPos.y) * r;
+                    tempPos.z = peakPos.z + (hPos.z - peakPos.z) * r;
+
+                    this.node.setWorldPosition(tempPos);
+
+                    const s = 1 + (LEVEL_CONFIG.fallAnimScale - 1) * r;
+                    tempScale.set(startScale.x * s, startScale.y * s, startScale.z * s);
+                    this.node.setWorldScale(tempScale);
+                }
+            })
             .call(() => {
                 // Вернуть в пул (не destroy!)
                 this.onCollected?.(this);

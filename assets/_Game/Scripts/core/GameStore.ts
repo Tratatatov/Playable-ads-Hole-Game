@@ -33,7 +33,9 @@ class GameStoreImpl implements IGameStore {
 
     addScore(delta: number): void {
         this._score += delta;
+        this._holeScale += LEVEL_CONFIG.holeGrowthPerItem;
         EventBus.emit(GameEvent.SCORE_CHANGED, { score: this._score });
+        EventBus.emit(GameEvent.HOLE_SIZE_CHANGED, { scale: this._holeScale });
         this._checkSizeThreshold();
     }
 

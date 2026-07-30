@@ -26,11 +26,15 @@ export class HoleController extends Component {
     private readonly _moveDir: Vec3 = new Vec3();
     private readonly _newPos: Vec3 = new Vec3();
     private readonly _targetScale: Vec3 = new Vec3();
+    private readonly _currentScale: Vec3 = new Vec3();
     private readonly _initialScale: Vec3 = new Vec3(); // Исходный масштаб из префаба
 
     // ── Состояние ────────────────────────────────────────────────────────
     @property({ type: RigidBody, tooltip: 'Ссылка на RigidBody дыры' })
     rigidBody: RigidBody | null = null;
+
+    @property({ type: Collider, tooltip: 'Коллайдер-триггер для поглощения предметов (если не указан, ищется на текущем узле)' })
+    absorbTrigger: Collider | null = null;
 
     private _currentSpeed: number = 0;
     private _scaleTween: Tween<Node> | null = null;
@@ -45,9 +49,10 @@ export class HoleController extends Component {
         // Запоминаем исходный масштаб из префаба
         this._initialScale.set(this.node.scale);
         this._targetScale.set(this.node.scale);
+        this._currentScale.set(this.node.scale);
 
         // Подписываемся на события коллизий (В Cocos Creator это обязательно!)
-        const collider = this.getComponent(Collider);
+        const collider = this.absorbTrigger || this.getComponent(Collider);
         if (collider) {
             collider.on('onTriggerEnter', this.onTriggerEnter, this);
         } else {
@@ -58,7 +63,7 @@ export class HoleController extends Component {
     }
 
     onDestroy(): void {
-        const collider = this.getComponent(Collider);
+        const collider = this.absorbTrigger || this.getComponent(Collider);
         if (collider) {
             collider.off('onTriggerEnter', this.onTriggerEnter, this);
         }
@@ -110,6 +115,12 @@ export class HoleController extends Component {
             );
             this.node.setPosition(this._newPos);
         }
+
+        // LERP-сглаживание масштаба дыры к целевому значению _targetScale
+        if (!this.node.scale.equals(this._targetScale, 0.0001)) {
+            Vec3.lerp(this._currentScale, this.node.scale, this._targetScale, Math.min(1, dt * LEVEL_CONFIG.holeScaleLerpSpeed));
+            this.node.setScale(this._currentScale);
+        }
     }
 
     // ── Trigger-коллизия (поглощение предмета) ────────────────────────────
@@ -118,26 +129,19 @@ export class HoleController extends Component {
         const other = event.otherCollider.node;
         const collectable = other.getComponent(Collectable);
         if (collectable) {
-            collectable.collect();
+            collectable.collect(event.selfCollider.node);
         }
     }
 
     // ── EventBus handlers ─────────────────────────────────────────────────
 
     private _onSizeChanged(payload: { scale: number }): void {
-        // Плавное увеличение дыры через tween (RULES §2.1: нет new Vec3 здесь)
-        if (this._scaleTween) { this._scaleTween.stop(); }
-
         // Увеличиваем размер относительно исходного размера префаба
         this._targetScale.set(
             this._initialScale.x * payload.scale,
             this._initialScale.y,
             this._initialScale.z * payload.scale
         );
-
-        this._scaleTween = tween(this.node)
-            .to(LEVEL_CONFIG.holeSizeTweenTime, { scale: this._targetScale })
-            .start();
 
         // Скорость растёт пропорционально размеру (RULES §5.2)
         const raw = LEVEL_CONFIG.holeDefaultSpeed * (1 + (payload.scale - 1) * LEVEL_CONFIG.speedScaleMult);
