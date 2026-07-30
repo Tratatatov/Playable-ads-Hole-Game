@@ -31,6 +31,12 @@ export class LevelConfig extends Component {
     @property({ group: { name: 'Hole Settings', id: '1' } })
     holeMaxSpeed: number = 18;
 
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Прирост масштаба дыры за каждый собранный предмет' })
+    holeGrowthPerItem: number = 0.05;
+
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость Lerp-сглаживания масштаба дыры' })
+    holeScaleLerpSpeed: number = 10;
+
     @property({ group: { name: 'Hole Settings', id: '1' } })
     holeSizeTweenTime: number = 0.35;
 
@@ -60,17 +66,11 @@ export class LevelConfig extends Component {
     @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Доп. объектов в пуле сверх collectableCount' })
     poolWarmupExtra: number = 5;
 
-    @property({ group: { name: 'Collectables', id: '3' } })
-    bobSpeed: number = 2;
+    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Время анимации подпрыгивания перед падением' })
+    jumpAnimTime: number = 0.15;
 
-    @property({ group: { name: 'Collectables', id: '3' } })
-    bobHeight: number = 0.1;
-
-    @property({ group: { name: 'Collectables', id: '3' } })
-    bobBaseY: number = 0.15;
-
-    @property({ group: { name: 'Collectables', id: '3' } })
-    rotSpeed: number = 30;
+    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Высота подпрыгивания' })
+    jumpAnimHeight: number = 1.0;
 
     @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Время анимации падения в дыру' })
     fallAnimTime: number = 0.2;
