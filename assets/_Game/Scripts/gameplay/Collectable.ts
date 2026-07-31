@@ -26,27 +26,43 @@ export class Collectable extends Component {
     /** Очки за сбор этого предмета (из LevelConfig) */
     public scoreValue: number = 5;
     /** Индекс типа для текстуры */
-    @property({ type: ccenum(CollectableType) })
+    @property({ type: CollectableType })
     public type: CollectableType = CollectableType.Blue;
 
     @property(MeshRenderer)
     public meshRenderer: MeshRenderer = null!;
 
-    /** Колбэк в пул — проставляется CollectablePool */
-    public onCollected: ((item: Collectable) => void) | null = null;
+    @property({ tooltip: 'Задавать случайный угол поворота по 3 осям при спавне/инициализации' })
+    public SetRandomAngle: boolean = false;
+
+
 
     private _collected: boolean = false;
 
     onEnable(): void {
         this._collected = false;
+        this.applyRandomAngle();
+    }
+
+    /** Задать случайный угол поворота по 3 осям, если включен SetRandomAngle */
+    public applyRandomAngle(): void {
+        const isRandom = this.SetRandomAngle || (LEVEL_CONFIG && LEVEL_CONFIG.SetRandomAngle);
+        if (isRandom) {
+            const rx = Math.random() * 360;
+            const ry = Math.random() * 360;
+            const rz = Math.random() * 360;
+            this.node.setRotationFromEuler(rx, ry, rz);
+        } else {
+            this.node.setRotationFromEuler(0, 0, 0);
+        }
     }
 
     /** Вызывается HoleController при коллизии */
     collect(holeNode?: Node): void {
         if (this._collected) return;
         this._collected = true;
-        // Добавляем очки в GameStore (он сам эмитит SCORE_CHANGED)
-        GameStore.addScore(this.scoreValue);
+        // Добавляем очки в GameStore (он сам эмитит SCORE_CHANGED и REMAINING_CHANGED)
+        GameStore.collectItem(this.type, this.scoreValue);
         EventBus.emit(GameEvent.ITEM_COLLECTED, {
             score:      this.scoreValue,
             totalScore: GameStore.score,
@@ -104,8 +120,8 @@ export class Collectable extends Component {
                 }
             })
             .call(() => {
-                // Вернуть в пул (не destroy!)
-                this.onCollected?.(this);
+                // Скрываем объект (без destroy, чтобы не вызывать GC)
+                this.node.active = false;
             })
             .start();
     }

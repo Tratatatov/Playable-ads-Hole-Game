@@ -16,12 +16,18 @@ import { GameStore } from './core/GameStore';
 import { AdNetworkManager } from './core/AdNetworkManager';
 import { InputService } from './core/InputService';
 import { CameraControlService } from './core/CameraControlService';
-import { CollectablePool } from './gameplay/CollectablePool';
 import { HoleController } from './gameplay/HoleController';
 import { LevelConfig, setLevelConfig } from './gameplay/LevelConfig';
-import { HUD } from './ui/HUD';
-import { TutorialUI } from './ui/TutorialUI';
-import { EndCard } from './ui/EndCard';
+import { UIConfig } from './ui/UIConfig';
+import { Collectable, CollectableType } from './gameplay/Collectable';
+import { HUDView } from './ui/HUDView';
+import { HUDPresenter } from './ui/HUDPresenter';
+import { TutorialView } from './ui/TutorialView';
+import { TutorialPresenter } from './ui/TutorialPresenter';
+import { EndCardView } from './ui/EndCardView';
+import { EndCardPresenter } from './ui/EndCardPresenter';
+import { RemainingCollectablesView } from './ui/RemainingCollectablesView';
+import { RemainingCollectablesPresenter } from './ui/RemainingCollectablesPresenter';
 
 const { ccclass, property } = _decorator;
 
@@ -39,20 +45,17 @@ export class GameBootstrap extends Component {
     @property(LevelConfig)
     levelConfig: LevelConfig = null!;
 
+    @property(UIConfig)
+    uiConfig: UIConfig = null!;
+
     @property(HoleController)
     holeController: HoleController = null!;
 
-    @property(CollectablePool)
-    collectablePool: CollectablePool = null!;
 
-    @property(HUD)
-    hud: HUD = null!;
-
-    @property(TutorialUI)
-    tutorialUI: TutorialUI = null!;
-
-    @property(EndCard)
-    endCard: EndCard = null!;
+    private _hudPresenter: HUDPresenter | null = null;
+    private _tutorialPresenter: TutorialPresenter | null = null;
+    private _endCardPresenter: EndCardPresenter | null = null;
+    private _remainingPresenter: RemainingCollectablesPresenter | null = null;
 
     // ── Scratch-переменная для размещения коллектаблов (no new in runtime) ──
     private readonly _spawnPos: Vec3 = new Vec3();
@@ -92,19 +95,73 @@ export class GameBootstrap extends Component {
         // 0. Initialize components
         console.log('[Регистрация сервисов] Инициализация контроллеров сцены (Hole, HUD, UI)');
         this.holeController?.init();
-        this.hud?.init();
-        this.tutorialUI?.init();
-        this.endCard?.init();
         if (this.mainCamera && this.holeController) {
             CameraControlService.init(this.mainCamera, this.holeController.node);
         }
 
-        // 1. Prewarm пула
-        if (this.collectablePool) {
-            console.log('[Регистрация сервисов] Prewarm пула коллектаблов');
-            this.collectablePool.setTextures(this.collectableTextures);
-            this.collectablePool.prewarm();
+        if (this.uiConfig) {
+            if (this.uiConfig.remainingBlueLabel && this.uiConfig.remainingRedLabel && this.uiConfig.remainingGreenLabel && this.uiConfig.remainingTurquoiseLabel) {
+                const remainingView = new RemainingCollectablesView(
+                    this.uiConfig.remainingBlueLabel,
+                    this.uiConfig.remainingRedLabel,
+                    this.uiConfig.remainingGreenLabel,
+                    this.uiConfig.remainingTurquoiseLabel
+                );
+                this._remainingPresenter = new RemainingCollectablesPresenter(remainingView);
+                this._remainingPresenter.init();
+            }
+
+            if (this.uiConfig.hudScoreLabel && this.uiConfig.hudTimerLabel) {
+                const hudView = new HUDView(this.uiConfig.hudScoreLabel, this.uiConfig.hudTimerLabel);
+                this._hudPresenter = new HUDPresenter(hudView);
+                this._hudPresenter.init();
+            }
+
+            if (this.uiConfig.tutorialFingerNode && this.uiConfig.tutorialHintLabel && this.uiConfig.tutorialPanel && this.uiConfig.tutorialPanelOpacity) {
+                const tutorialView = new TutorialView(
+                    this.uiConfig.tutorialFingerNode,
+                    this.uiConfig.tutorialHintLabel,
+                    this.uiConfig.tutorialPanel,
+                    this.uiConfig.tutorialPanelOpacity
+                );
+                this._tutorialPresenter = new TutorialPresenter(tutorialView);
+                this._tutorialPresenter.init();
+            }
+
+            if (this.uiConfig.endCardPanel && this.uiConfig.endCardOpacity && this.uiConfig.endCardFinalScoreLabel && this.uiConfig.endCardCtaButton && this.uiConfig.endCardCtaLabel) {
+                const endCardView = new EndCardView(
+                    this.uiConfig.endCardPanel,
+                    this.uiConfig.endCardOpacity,
+                    this.uiConfig.endCardFinalScoreLabel,
+                    this.uiConfig.endCardCtaButton,
+                    this.uiConfig.endCardCtaLabel
+                );
+                this._endCardPresenter = new EndCardPresenter(endCardView);
+                this._endCardPresenter.init();
+            }
         }
+
+        // 1. Инициализация предразмещенных объектов (без пула)
+        console.log('[Регистрация сервисов] Поиск предразмещенных коллектаблов на сцене');
+        const collectables = director.getScene()?.getComponentsInChildren(Collectable) || [];
+        const counts: Record<CollectableType, number> = {
+            [CollectableType.Blue]: 0,
+            [CollectableType.Red]: 0,
+            [CollectableType.Green]: 0,
+            [CollectableType.Turquoise]: 0
+        };
+
+        for (const comp of collectables) {
+            comp.scoreValue = this.levelConfig.collectableScore;
+            
+            if (this.collectableTextures.length > 0) {
+                comp.setTexture(this.collectableTextures[comp.type % this.collectableTextures.length]);
+            }
+            counts[comp.type]++;
+        }
+        
+        GameStore.setInitialCollectables(counts);
+        console.log(`[GameBootstrap] Зарегистрировано ${collectables.length} предразмещенных объектов.`);
 
         // 2. Сбросить состояние
         console.log('[GameBootstrap] Сброс состояния игры');
@@ -132,25 +189,10 @@ export class GameBootstrap extends Component {
         console.log('[GameBootstrap] Инициализация завершена!');
     }
 
-    private _spawnCollectables(): void {
-        if (!this.collectablePool) return;
-        const half = this.levelConfig.arenaHalfSize - 1;
-        for (let i = 0; i < this.levelConfig.collectableCount; i++) {
-            // Случайная позиция на арене (scratch-вектор переиспользуется)
-            this._spawnPos.set(
-                (Math.random() * 2 - 1) * half,
-                0.15,
-                (Math.random() * 2 - 1) * half,
-            );
-            const typeIdx = Math.floor(Math.random() * 4);
-            this.collectablePool.acquire(this._spawnPos, typeIdx);
-        }
-    }
+
 
     private _onFirstTouch = (): void => {
         console.log('[GameBootstrap] Первый тач! Переход в GameplayState');
-        // Спавним коллектаблы только сейчас, чтобы они не были видны до старта
-        this._spawnCollectables();
         GameStateMachine.transition(GameState.Gameplay);
         EventBus.emit(GameEvent.GAME_START, undefined as never);
     };
@@ -174,5 +216,9 @@ export class GameBootstrap extends Component {
         EventBus.off(GameEvent.FIRST_TOUCH, this._onFirstTouch, this);
         EventBus.off(GameEvent.GAME_START, this._onGameStart, this);
         EventBus.off(GameEvent.GAME_END, this._onGameEnd, this);
+        this._remainingPresenter?.destroy();
+        this._hudPresenter?.destroy();
+        this._tutorialPresenter?.destroy();
+        this._endCardPresenter?.destroy();
     }
 }
