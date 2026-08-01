@@ -1,6 +1,9 @@
-import { EventBus, GameEvent } from '../core/EventBus';
 import { TutorialView } from './TutorialView';
 
+/**
+ * TutorialPresenter — показ/скрытие туториала.
+ * Управляется TutorialState через show()/hide().
+ */
 export class TutorialPresenter {
     private _view: TutorialView;
 
@@ -9,16 +12,19 @@ export class TutorialPresenter {
     }
 
     public init(): void {
-        EventBus.on(GameEvent.GAME_START, this._onGameStart, this);
-        this._view.show();
+        // Скрыт до входа в TutorialState
+        this._view.hideImmediate();
     }
 
     public destroy(): void {
-        EventBus.off(GameEvent.GAME_START, this._onGameStart, this);
         this._view.stopAnimations();
     }
 
-    private _onGameStart = (): void => {
+    public show(): void {
+        this._view.show();
+    }
+
+    public hide(): void {
         this._view.hide();
-    };
+    }
 }

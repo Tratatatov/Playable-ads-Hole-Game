@@ -5,10 +5,9 @@
  * RULES §2.2: Запрещено destroy() во время геймплея.
  */
 
-import { _decorator, Component, Node, Vec3, MeshRenderer, Texture2D, ccenum, tween } from 'cc';
+import { _decorator, Component, Node, Vec3, ccenum, tween } from 'cc';
 import { EventBus, GameEvent } from '../core/EventBus';
 import { GameStore } from '../core/GameStore';
-import { GameState } from '../core/GameStateMachine';
 import { LEVEL_CONFIG } from './LevelConfig';
 
 const { ccclass, property } = _decorator;
@@ -17,7 +16,7 @@ export enum CollectableType {
     Blue = 0,
     Red,
     Green,
-    Turquoise
+    Teal
 }
 ccenum(CollectableType);
 
@@ -25,12 +24,9 @@ ccenum(CollectableType);
 export class Collectable extends Component {
     /** Очки за сбор этого предмета (из LevelConfig) */
     public scoreValue: number = 5;
-    /** Индекс типа для текстуры */
+
     @property({ type: CollectableType })
     public type: CollectableType = CollectableType.Blue;
-
-    @property(MeshRenderer)
-    public meshRenderer: MeshRenderer = null!;
 
     @property({ tooltip: 'Задавать случайный угол поворота по 3 осям при спавне/инициализации' })
     public SetRandomAngle: boolean = false;
@@ -46,7 +42,7 @@ export class Collectable extends Component {
 
     /** Задать случайный угол поворота по 3 осям, если включен SetRandomAngle */
     public applyRandomAngle(): void {
-        const isRandom = this.SetRandomAngle || (LEVEL_CONFIG && LEVEL_CONFIG.SetRandomAngle);
+        const isRandom = this.SetRandomAngle;
         if (isRandom) {
             const rx = Math.random() * 360;
             const ry = Math.random() * 360;
@@ -124,14 +120,5 @@ export class Collectable extends Component {
                 this.node.active = false;
             })
             .start();
-    }
-
-    /** Назначить текстуру на материал */
-    setTexture(tex: Texture2D | null): void {
-        if (!tex || !this.meshRenderer || !this.meshRenderer.sharedMaterial) return;
-        
-        // Клонируем материал чтобы не менять shared material у пула
-        const mat = this.meshRenderer.material;
-        if (mat) mat.setProperty('mainTexture', tex);
     }
 }

@@ -110,7 +110,7 @@
             "_value": false
           },
           "geometry-renderer": {
-            "_value": false
+            "_value": true
           },
           "debug-renderer": {
             "_value": false
@@ -204,6 +204,7 @@
           "custom-pipeline",
           "dragon-bones",
           "gfx-webgl",
+          "geometry-renderer",
           "graphics",
           "intersection-2d",
           "light-probe",

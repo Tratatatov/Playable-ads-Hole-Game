@@ -77,6 +77,8 @@
   ],
   "_props": [
     {
+      "roughness": 0.785,
+      "specularIntensity": 0.945,
       "mainTexture": {
         "__uuid__": "2603f094-0b0e-4fc1-be00-5f3e839f2d81@6c48a",
         "__expectedType__": "cc.Texture2D"

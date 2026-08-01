@@ -2,18 +2,18 @@
   "ver": "2.3.14",
   "importer": "gltf",
   "imported": true,
-  "uuid": "7ec0d1f0-9007-4034-a6d8-c3e9d5b12a58",
+  "uuid": "e630ac07-c3f8-4884-9666-1e36e2424ad6",
   "files": [],
   "subMetas": {
-    "6da96": {
+    "80c75": {
       "importer": "gltf-mesh",
-      "uuid": "7ec0d1f0-9007-4034-a6d8-c3e9d5b12a58@6da96",
+      "uuid": "e630ac07-c3f8-4884-9666-1e36e2424ad6@80c75",
       "displayName": "",
-      "id": "6da96",
-      "name": "Mesh.007.mesh",
+      "id": "80c75",
+      "name": "Mesh.001.mesh",
       "userData": {
         "gltfIndex": 0,
-        "triangleCount": 56
+        "triangleCount": 378
       },
       "ver": "1.1.1",
       "imported": true,
@@ -23,28 +23,12 @@
       ],
       "subMetas": {}
     },
-    "e736c": {
-      "importer": "gltf-material",
-      "uuid": "7ec0d1f0-9007-4034-a6d8-c3e9d5b12a58@e736c",
-      "displayName": "",
-      "id": "e736c",
-      "name": "Material.004.material",
-      "userData": {
-        "gltfIndex": 0
-      },
-      "ver": "1.0.14",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
-    "13b20": {
+    "5d934": {
       "importer": "gltf-scene",
-      "uuid": "7ec0d1f0-9007-4034-a6d8-c3e9d5b12a58@13b20",
+      "uuid": "e630ac07-c3f8-4884-9666-1e36e2424ad6@5d934",
       "displayName": "",
-      "id": "13b20",
-      "name": "Pike.prefab",
+      "id": "5d934",
+      "name": "macaroon-001.prefab",
       "userData": {
         "gltfIndex": 0
       },
@@ -78,16 +62,31 @@
     },
     "assetFinder": {
       "meshes": [
-        "7ec0d1f0-9007-4034-a6d8-c3e9d5b12a58@6da96"
+        "e630ac07-c3f8-4884-9666-1e36e2424ad6@80c75"
       ],
       "skeletons": [],
       "textures": [],
-      "materials": [
-        "7ec0d1f0-9007-4034-a6d8-c3e9d5b12a58@e736c"
-      ],
+      "materials": [],
       "scenes": [
-        "7ec0d1f0-9007-4034-a6d8-c3e9d5b12a58@13b20"
+        "e630ac07-c3f8-4884-9666-1e36e2424ad6@5d934"
       ]
+    },
+    "meshSimplify": {
+      "targetRatio": 0.56
+    },
+    "legacyFbxImporter": false,
+    "allowMeshDataAccess": true,
+    "addVertexColor": false,
+    "generateLightmapUVNode": false,
+    "meshOptimizer": {
+      "enable": false,
+      "algorithm": "simplify",
+      "simplifyOptions": {
+        "targetRatio": 1,
+        "enableSmartLink": true,
+        "agressiveness": 7,
+        "maxIterationCount": 100
+      }
     }
   }
 }

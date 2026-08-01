@@ -4,13 +4,13 @@
  * Механики:
  *   - Читает InputService → движение по арене
  *   - Trigger-коллизии с Collectable → поглощение
- *   - Масштаб пересчитывается по GameStore.holeScale (через EventBus)
+ *   - Рост: HoleGrowthService → HOLE_SIZE_CHANGED → целевой scale; здесь Lerp к нему
  *
  * RULES §2.1: Все scratch-переменные преаллоцированы, нет new Vec3() в update().
  */
 
 import {
-    _decorator, Component, Node, Vec3, ITriggerEvent, tween, Tween, RigidBody, Collider
+    _decorator, Component, Vec3, ITriggerEvent, RigidBody, Collider, view
 } from 'cc';
 import { EventBus, GameEvent } from '../core/EventBus';
 import { GameStateMachine, GameState } from '../core/GameStateMachine';
@@ -23,7 +23,8 @@ const { ccclass, property } = _decorator;
 @ccclass('HoleController')
 export class HoleController extends Component {
     // ── Scratch переменные (RULES §2.1 — нет new в update()) ─────────────
-    private readonly _moveDir: Vec3 = new Vec3();
+    private readonly _currentVel: Vec3 = new Vec3();   // текущая скорость (сглаженная)
+    private readonly _targetVel: Vec3 = new Vec3();    // целевая скорость из инпута
     private readonly _newPos: Vec3 = new Vec3();
     private readonly _targetScale: Vec3 = new Vec3();
     private readonly _currentScale: Vec3 = new Vec3();
@@ -36,16 +37,7 @@ export class HoleController extends Component {
     @property({ type: Collider, tooltip: 'Коллайдер-триггер для поглощения предметов (если не указан, ищется на текущем узле)' })
     absorbTrigger: Collider | null = null;
 
-    private _currentSpeed: number = 0;
-    private _scaleTween: Tween<Node> | null = null;
-
-    // ── Размеры арены ────────────────────────────────────────────────────
-    private _half: number = 0;
-
     init(): void {
-        this._currentSpeed = LEVEL_CONFIG.holeDefaultSpeed;
-        this._half = LEVEL_CONFIG.arenaHalfSize;
-
         // Запоминаем исходный масштаб из префаба
         this._initialScale.set(this.node.scale);
         this._targetScale.set(this.node.scale);
@@ -74,49 +66,60 @@ export class HoleController extends Component {
 
     update(dt: number): void {
         if (!GameStateMachine.is(GameState.Gameplay)) return;
+        if (dt <= 0) return;
 
-        // Если нет касания, inputDelta будет (0,0), и мы сбросим скорость ниже
-        const inputDelta = InputService.consumeDelta();
-        if (!InputService.isTouching || (inputDelta.x === 0 && inputDelta.y === 0)) {
-            if (this.rigidBody) {
-                this._moveDir.set(0, 0, 0);
-                this.rigidBody.setLinearVelocity(this._moveDir);
-            }
-            return;
+        const offset = InputService.touchOffset;
+        const lerpT  = Math.min(1, dt * LEVEL_CONFIG.velocityLerpSpeed);
+
+        // Смещение от точки касания → доля короткой стороны экрана (0..1+)
+        const size = view.getVisibleSize();
+        const screenRef = Math.max(1, Math.min(size.width, size.height));
+        const ox = offset.x / screenRef;
+        const oz = -offset.y / screenRef;
+        const offsetMag = Math.sqrt(ox * ox + oz * oz);
+
+        const minPct = LEVEL_CONFIG.inputMinSwipePct;
+        const maxPct = LEVEL_CONFIG.inputMaxSwipePct;
+
+        if (!InputService.isTouching || offsetMag < minPct) {
+            this._targetVel.set(0, 0, 0);
+        } else {
+            // t: 0 на minPct → holeMinSpeed; 1 на maxPct → holeMaxSpeed
+            const range = Math.max(1e-6, maxPct - minPct);
+            const t = Math.min(1, Math.max(0, (offsetMag - minPct) / range));
+
+            const minSpeed = LEVEL_CONFIG.holeMinSpeed;
+            const maxSpeed = Math.max(minSpeed, LEVEL_CONFIG.holeMaxSpeed);
+            const speed = minSpeed + (maxSpeed - minSpeed) * t;
+
+            const inv = 1 / offsetMag;
+            this._targetVel.set(
+                ox * inv * speed,
+                0,
+                oz * inv * speed
+            );
         }
 
-        if (!this.rigidBody) {
-            console.warn('[HoleController] ВНИМАНИЕ: RigidBody не назначен в инспекторе! Падение в фолбэк setPosition (может не работать с физикой).');
+        // Плавная смена направления и скорости через lerp
+        Vec3.lerp(this._currentVel, this._currentVel, this._targetVel, lerpT);
+        if (this._currentVel.lengthSqr() < 0.0001) {
+            this._currentVel.set(0, 0, 0);
         }
 
         if (this.rigidBody) {
-            // Виртуальный джойстик дает постоянный вектор направления [-1, 1]
-            // Поэтому просто умножаем его на скорость
-            this._moveDir.set(
-                inputDelta.x * this._currentSpeed,
-                0,
-                -inputDelta.y * this._currentSpeed
-            );
-            this.rigidBody.setLinearVelocity(this._moveDir);
+            this.rigidBody.setLinearVelocity(this._currentVel);
         } else {
-            // Фолбэк: Кинематическое движение без RigidBody
-            this._moveDir.set(
-                inputDelta.x * this._currentSpeed,
-                0,
-                -inputDelta.y * this._currentSpeed
-            );
-
+            console.warn('[HoleController] ВНИМАНИЕ: RigidBody не назначен в инспекторе!');
             const p = this.node.position;
-            const hs = this._half - this.node.scale.x * 0.5;
             this._newPos.set(
-                Math.max(-hs, Math.min(hs, p.x + this._moveDir.x)),
+                p.x + this._currentVel.x * dt,
                 p.y,
-                Math.max(-hs, Math.min(hs, p.z + this._moveDir.z)),
+                p.z + this._currentVel.z * dt
             );
             this.node.setPosition(this._newPos);
         }
 
-        // LERP-сглаживание масштаба дыры к целевому значению _targetScale
+        // LERP-сглаживание масштаба дыры (между скачками порогов)
         if (!this.node.scale.equals(this._targetScale, 0.0001)) {
             Vec3.lerp(this._currentScale, this.node.scale, this._targetScale, Math.min(1, dt * LEVEL_CONFIG.holeScaleLerpSpeed));
             this.node.setScale(this._currentScale);
@@ -126,6 +129,7 @@ export class HoleController extends Component {
     // ── Trigger-коллизия (поглощение предмета) ────────────────────────────
 
     onTriggerEnter(event: ITriggerEvent): void {
+        if (!GameStateMachine.is(GameState.Gameplay)) return;
         const other = event.otherCollider.node;
         const collectable = other.getComponent(Collectable);
         if (collectable) {
@@ -141,13 +145,6 @@ export class HoleController extends Component {
             this._initialScale.x * payload.scale,
             this._initialScale.y,
             this._initialScale.z * payload.scale
-        );
-
-        // Скорость растёт пропорционально размеру (RULES §5.2)
-        const raw = LEVEL_CONFIG.holeDefaultSpeed * (1 + (payload.scale - 1) * LEVEL_CONFIG.speedScaleMult);
-        this._currentSpeed = Math.max(
-            LEVEL_CONFIG.holeMinSpeed,
-            Math.min(LEVEL_CONFIG.holeMaxSpeed, raw),
         );
     }
 }

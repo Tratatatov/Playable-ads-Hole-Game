@@ -15,6 +15,7 @@ export interface IGameStore {
     readonly remainingCounts: Record<CollectableType, number>;
     reset(): void;
     addScore(delta: number): void;
+    setHoleScale(scale: number): void;
     collectItem(type: CollectableType, scoreValue: number): void;
     setInitialCollectables(counts: Record<CollectableType, number>): void;
     setTimeLeft(t: number): void;
@@ -28,7 +29,7 @@ class GameStoreImpl implements IGameStore {
         [CollectableType.Blue]: 0,
         [CollectableType.Red]: 0,
         [CollectableType.Green]: 0,
-        [CollectableType.Turquoise]: 0,
+        [CollectableType.Teal]: 0,
     };
 
     get score():     number { return this._score; }
@@ -44,7 +45,7 @@ class GameStoreImpl implements IGameStore {
             [CollectableType.Blue]: 0,
             [CollectableType.Red]: 0,
             [CollectableType.Green]: 0,
-            [CollectableType.Turquoise]: 0,
+            [CollectableType.Teal]: 0,
         };
     }
 
@@ -54,40 +55,51 @@ class GameStoreImpl implements IGameStore {
     }
 
     collectItem(type: CollectableType, scoreValue: number): void {
-        if (this._remainingCounts[type] > 0) {
-            this._remainingCounts[type]--;
+        const prev = this._remainingCounts[type];
+        if (prev > 0) {
+            this._remainingCounts[type] = prev - 1;
         }
         EventBus.emit(GameEvent.REMAINING_CHANGED, { counts: this._remainingCounts });
+
+        if (this._remainingCounts[type] <= 0 && prev > 0) {
+            this._emitTypeCleared(type);
+        }
+
         this.addScore(scoreValue);
+    }
+
+    private _emitTypeCleared(type: CollectableType): void {
+        switch (type) {
+            case CollectableType.Blue:
+                EventBus.emit(GameEvent.TYPE_BLUE_CLEARED, null);
+                break;
+            case CollectableType.Red:
+                EventBus.emit(GameEvent.TYPE_RED_CLEARED, null);
+                break;
+            case CollectableType.Green:
+                EventBus.emit(GameEvent.TYPE_GREEN_CLEARED, null);
+                break;
+            case CollectableType.Teal:
+                EventBus.emit(GameEvent.TYPE_TEAL_CLEARED, null);
+                break;
+        }
     }
 
     addScore(delta: number): void {
         this._score += delta;
-        this._holeScale += LEVEL_CONFIG.holeGrowthPerItem;
-        
         EventBus.emit(GameEvent.SCORE_CHANGED, { score: this._score });
+    }
+
+    /** Масштаб дыры. Рост управляется HoleGrowthService → HOLE_SIZE_CHANGED. */
+    setHoleScale(scale: number): void {
+        if (this._holeScale === scale) return;
+        this._holeScale = scale;
         EventBus.emit(GameEvent.HOLE_SIZE_CHANGED, { scale: this._holeScale });
-        this._checkSizeThreshold();
     }
 
     setTimeLeft(t: number): void {
         this._timeLeft = t;
         EventBus.emit(GameEvent.TIMER_TICK, { timeLeft: t });
-    }
-
-    /** Проверяем пороги роста дыры по таблице HoleSizeThreshold */
-    private _checkSizeThreshold(): void {
-        const thresholds = LEVEL_CONFIG.holeSizeThresholds;
-        let newScale = 1;
-        for (let i = 0; i < thresholds.length; i++) {
-            if (this._score >= thresholds[i].scoreThreshold) {
-                newScale = 1 + thresholds[i].sizeIncrease;
-            }
-        }
-        if (newScale !== this._holeScale) {
-            this._holeScale = newScale;
-            EventBus.emit(GameEvent.HOLE_SIZE_CHANGED, { scale: this._holeScale });
-        }
     }
 }
 

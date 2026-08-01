@@ -28,7 +28,8 @@
       "1": 7,
       "2": 3,
       "3": 9
-    }
+    },
+    "fixedTimeStep": 0.02
   },
   "sorting-layer": {
     "layers": [

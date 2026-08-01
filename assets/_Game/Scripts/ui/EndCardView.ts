@@ -4,7 +4,6 @@ import { LEVEL_CONFIG } from '../gameplay/LevelConfig';
 export class EndCardView {
     private _panel: Node | null = null;
     private _panelOpacity: UIOpacity | null = null;
-    private _finalScoreLabel: Label | null = null;
     private _ctaButton: Button | null = null;
     private _ctaLabel: Label | null = null;
 
@@ -15,13 +14,11 @@ export class EndCardView {
     constructor(
         panel: Node,
         panelOpacity: UIOpacity,
-        finalScoreLabel: Label,
         ctaButton: Button,
         ctaLabel: Label
     ) {
         this._panel = panel;
         this._panelOpacity = panelOpacity;
-        this._finalScoreLabel = finalScoreLabel;
         this._ctaButton = ctaButton;
         this._ctaLabel = ctaLabel;
 
@@ -42,13 +39,9 @@ export class EndCardView {
         }
     }
 
-    public show(score: number): void {
+    public show(): void {
         if (!this._panel) return;
-        
-        // Обновляем счёт
-        if (this._finalScoreLabel) {
-            this._finalScoreLabel.string = `Score: ${Math.floor(score)}`;
-        }
+
         if (this._ctaLabel) this._ctaLabel.string = 'Play Now!';
 
         // Анимация появления (pop-in)

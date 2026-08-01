@@ -2,12 +2,12 @@
   "ver": "1.1.50",
   "importer": "prefab",
   "imported": true,
-  "uuid": "d6def30c-ab11-4cce-b47f-e016d4b9448d",
+  "uuid": "64c1cdbf-b118-40f4-89a5-080ec8825c58",
   "files": [
     ".json"
   ],
   "subMetas": {},
   "userData": {
-    "syncNodeName": "Collectable"
+    "syncNodeName": "Gates"
   }
 }

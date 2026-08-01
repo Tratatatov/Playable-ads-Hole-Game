@@ -1,0 +1,25 @@
+---
+description: Prefab usage and LevelConfig conventions for the project
+globs: assets/**/*.ts
+alwaysApply: false
+---
+
+# Prefabs & Configuration Rules
+
+## Prefabs
+- Any game object created dynamically (collectables, effects, projectiles) MUST be a Prefab in Cocos Creator.
+- Procedural node creation (`new Node()`, `addComponent()` inside code) is FORBIDDEN for designer-configured objects.
+- Prefabs are passed via `@property(Prefab)` and instantiated via `instantiate(prefab)` ONLY during `BootState` (pool prewarm).
+- FORBIDDEN to call `instantiate()` during active `GameplayState`.
+
+## LevelConfig — Single Source of Truth
+- All numeric game constants (speeds, scales, thresholds, timers) that a designer might want to change MUST live in `LevelConfig.ts`.
+- FORBIDDEN to hardcode game parameters inside components.
+
+```typescript
+// ✅ CORRECT
+this._speed = LEVEL_CONFIG.holeDefaultSpeed;
+
+// ❌ WRONG
+this._speed = 6; // magic number in component
+```
