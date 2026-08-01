@@ -34,10 +34,19 @@ export class Collectable extends Component {
 
 
     private _collected: boolean = false;
+    private _orientationApplied: boolean = false;
+
+    /** Уже собран — OptimizationService не должен снова включать node */
+    public get isCollected(): boolean {
+        return this._collected;
+    }
 
     onEnable(): void {
         this._collected = false;
-        this.applyRandomAngle();
+        if (!this._orientationApplied) {
+            this.applyRandomAngle();
+            this._orientationApplied = true;
+        }
     }
 
     /** Задать случайный угол поворота по 3 осям, если включен SetRandomAngle */

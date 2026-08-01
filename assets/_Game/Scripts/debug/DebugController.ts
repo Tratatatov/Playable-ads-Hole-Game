@@ -1,8 +1,17 @@
 import { _decorator, Component, input, Input, EventKeyboard, KeyCode, Vec3, RigidBody, director, Vec2 } from 'cc';
 import { GameBootstrap } from '../GameBootstrap';
 import { HoleController } from '../gameplay/HoleController';
+import { Collectable, CollectableType } from '../gameplay/Collectable';
 
 const { ccclass, property } = _decorator;
+
+/** Хоткеи мгновенного сбора по цвету (только debug). */
+const DEBUG_COLLECT_HOTKEYS: ReadonlyArray<{ key: KeyCode; numpad: KeyCode; type: CollectableType }> = [
+    { key: KeyCode.DIGIT_1, numpad: KeyCode.NUM_1, type: CollectableType.Blue },
+    { key: KeyCode.DIGIT_2, numpad: KeyCode.NUM_2, type: CollectableType.Red },
+    { key: KeyCode.DIGIT_3, numpad: KeyCode.NUM_3, type: CollectableType.Teal },
+    { key: KeyCode.DIGIT_4, numpad: KeyCode.NUM_4, type: CollectableType.Green },
+];
 
 @ccclass('DebugController')
 export class DebugController extends Component {
@@ -32,7 +41,7 @@ export class DebugController extends Component {
             return;
         }
 
-        this._log('Режим отладки активирован! WASD управление включено.');
+        this._log('Режим отладки активирован! WASD + 1/2/3/4 (Blue/Red/Teal/Green collect all).');
 
         input.on(Input.EventType.KEY_DOWN, this._onKeyDown, this);
         input.on(Input.EventType.KEY_UP, this._onKeyUp, this);
@@ -102,11 +111,38 @@ export class DebugController extends Component {
     }
 
     private _onKeyDown(e: EventKeyboard) {
+        for (let i = 0; i < DEBUG_COLLECT_HOTKEYS.length; i++) {
+            const bind = DEBUG_COLLECT_HOTKEYS[i];
+            if (e.keyCode === bind.key || e.keyCode === bind.numpad) {
+                this._debugCollectAllOfType(bind.type);
+                return;
+            }
+        }
         this._keys.add(e.keyCode);
     }
 
     private _onKeyUp(e: EventKeyboard) {
         this._keys.delete(e.keyCode);
+    }
+
+    /** Debug: по очереди Collectable.collect() для всех активных предметов типа. */
+    private _debugCollectAllOfType(type: CollectableType): void {
+        const scene = director.getScene();
+        if (!scene) return;
+
+        const items = scene.getComponentsInChildren(Collectable);
+        const holeNode = this.holeController?.node;
+        let collected = 0;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (!item || !item.isValid || !item.node.active) continue;
+            if (item.type !== type) continue;
+            item.collect(holeNode);
+            collected++;
+        }
+
+        this._log(`Collect ${CollectableType[type]} × ${collected}`);
     }
 
     update(dt: number) {

@@ -11,6 +11,7 @@
   "_techIdx": 0,
   "_defines": [
     {
+      "USE_INSTANCING": true,
       "USE_TEXTURE": true
     },
     {},
@@ -37,10 +38,7 @@
     },
     {
       "rasterizerState": {},
-      "depthStencilState": {
-        "stencilTestFront": true,
-        "stencilFuncFront": 5
-      },
+      "depthStencilState": {},
       "blendState": {
         "targets": [
           {}
@@ -56,8 +54,8 @@
       },
       "tilingOffset": {
         "__type__": "cc.Vec4",
-        "x": 8,
-        "y": 8,
+        "x": 6,
+        "y": 6,
         "z": 0,
         "w": 0
       }

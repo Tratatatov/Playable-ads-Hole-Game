@@ -18,19 +18,25 @@
   ],
   "_states": [
     {
-      "priority": 201,
       "rasterizerState": {},
       "depthStencilState": {
         "stencilTestFront": true,
-        "stencilFuncFront": 2,
+        "stencilFuncFront": 5,
         "stencilReadMaskFront": 255,
         "stencilWriteMaskFront": 0,
         "stencilTestBack": true,
-        "stencilFuncBack": 2,
+        "stencilFuncBack": 5,
         "stencilReadMaskBack": 255,
         "stencilWriteMaskBack": 0
       },
       "blendState": {
+        "blendColor": {
+          "__type__": "cc.Color",
+          "r": 233,
+          "g": 233,
+          "b": 233,
+          "a": 255
+        },
         "targets": [
           {}
         ]
@@ -60,6 +66,13 @@
       "mainTexture": {
         "__uuid__": "b54f4919-48b8-4eff-875f-0baab5b1efb2@6c48a",
         "__expectedType__": "cc.Texture2D"
+      },
+      "tilingOffset": {
+        "__type__": "cc.Vec4",
+        "x": 2.5,
+        "y": 6,
+        "z": 1.7,
+        "w": 0
       }
     },
     {},

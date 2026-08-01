@@ -23,11 +23,15 @@ import { DoorService } from './core/DoorService';
 import { CollectableCollectionService } from './core/CollectableCollectionService';
 import { AudioService } from './core/AudioService';
 import { AudioConfig } from './core/AudioConfig';
+import { ParticleService } from './core/ParticleService';
 import { TutorialState } from './core/states/TutorialState';
 import { GameplayState } from './core/states/GameplayState';
 import { EndGameState } from './core/states/EndGameState';
 import { HoleController } from './gameplay/HoleController';
 import { LevelConfig, setLevelConfig } from './gameplay/LevelConfig';
+import { BatchingConfig, setBatchingConfig } from './gameplay/BatchingConfig';
+import { OptimizationConfig } from './gameplay/OptimizationConfig';
+import { OptimizationService } from './core/OptimizationService';
 import { UIConfig } from './ui/UIConfig';
 import { TimerView } from './ui/TimerView';
 import { TimerPresenter } from './ui/TimerPresenter';
@@ -57,6 +61,12 @@ export class GameBootstrap extends Component {
     @property(AudioConfig)
     audioConfig: AudioConfig = null!;
 
+    @property(BatchingConfig)
+    batchingConfig: BatchingConfig = null!;
+
+    @property(OptimizationConfig)
+    optimizationConfig: OptimizationConfig = null!;
+
     @property(HoleController)
     holeController: HoleController = null!;
 
@@ -67,11 +77,13 @@ export class GameBootstrap extends Component {
 
     start(): void {
         setLevelConfig(this.levelConfig);
+        setBatchingConfig(this.batchingConfig);
         this._boot();
     }
 
     update(dt: number): void {
         TimerService.update(dt);
+        OptimizationService.update(dt);
     }
 
     lateUpdate(dt: number): void {
@@ -101,11 +113,24 @@ export class GameBootstrap extends Component {
         DoorService.init();
         // После DoorService: коллекции слушают DOOR_OPENED и включают следующий цвет
         CollectableCollectionService.init();
+        ParticleService.init();
+        OptimizationService.init(
+            this.optimizationConfig,
+            this.holeController ? this.holeController.node : null
+        );
 
         if (this.audioConfig) {
             AudioService.init(this.audioConfig);
         } else {
             console.warn('[GameBootstrap] AudioConfig не назначен — SFX отключены');
+        }
+
+        if (!this.batchingConfig) {
+            console.warn('[GameBootstrap] BatchingConfig не назначен — активация коллекций с defaults');
+        }
+
+        if (!this.optimizationConfig) {
+            console.warn('[GameBootstrap] OptimizationConfig не назначен — distance culling выкл.');
         }
 
         // 3. Рекламная сеть
@@ -201,6 +226,8 @@ export class GameBootstrap extends Component {
         CollectableCollectionService.destroy();
         DoorService.destroy();
         HoleGrowthService.destroy();
+        ParticleService.destroy();
+        OptimizationService.destroy();
         AudioService.destroy();
         this._remainingPresenter?.destroy();
         this._timerPresenter?.destroy();

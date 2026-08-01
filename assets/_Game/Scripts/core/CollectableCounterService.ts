@@ -1,6 +1,6 @@
 /**
  * CollectableCounterService — обратный отсчёт коллектаблов по 4 типам.
- * Стартовые цели берутся из LevelConfig (синхронизируются через CollectableCounterTool).
+ * Стартовые цели берутся из LevelConfig (синхронизируются через CollectableContainer / Tool).
  * Состояние хранится в GameStore; UI обновляется через REMAINING_CHANGED → RemainingCollectablesPresenter.
  */
 

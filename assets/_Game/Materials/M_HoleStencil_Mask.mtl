@@ -16,7 +16,7 @@
   ],
   "_states": [
     {
-      "priority": 200,
+      "priority": 100,
       "rasterizerState": {},
       "depthStencilState": {
         "depthWrite": false,
@@ -30,6 +30,13 @@
         "stencilPassOpBack": 2
       },
       "blendState": {
+        "blendColor": {
+          "__type__": "cc.Color",
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 255
+        },
         "targets": [
           {
             "blendColorMask": 0

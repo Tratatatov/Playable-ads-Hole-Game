@@ -1,6 +1,6 @@
 /**
  * GameStore — единственное хранилище игрового состояния.
- * Только этот класс мутирует score, holeScale, timeLeft.
+ * Только этот класс мутирует score, holeScale, timeLeft, collectedCount.
  * Запрещены глобальные флаги вне этого класса (RULES §1.2).
  */
 
@@ -12,6 +12,7 @@ export interface IGameStore {
     readonly score: number;
     readonly holeScale: number;
     readonly timeLeft: number;
+    readonly collectedCount: number;
     readonly remainingCounts: Record<CollectableType, number>;
     reset(): void;
     addScore(delta: number): void;
@@ -25,6 +26,7 @@ class GameStoreImpl implements IGameStore {
     private _score:      number = 0;
     private _holeScale:  number = 1;
     private _timeLeft:   number = 0;
+    private _collectedCount: number = 0;
     private _remainingCounts: Record<CollectableType, number> = {
         [CollectableType.Blue]: 0,
         [CollectableType.Red]: 0,
@@ -35,12 +37,14 @@ class GameStoreImpl implements IGameStore {
     get score():     number { return this._score; }
     get holeScale(): number { return this._holeScale; }
     get timeLeft():  number { return this._timeLeft; }
+    get collectedCount(): number { return this._collectedCount; }
     get remainingCounts(): Record<CollectableType, number> { return this._remainingCounts; }
 
     reset(): void {
         this._score     = 0;
         this._holeScale = 1;
         this._timeLeft  = LEVEL_CONFIG.totalTime;
+        this._collectedCount = 0;
         this._remainingCounts = {
             [CollectableType.Blue]: 0,
             [CollectableType.Red]: 0,
@@ -55,6 +59,8 @@ class GameStoreImpl implements IGameStore {
     }
 
     collectItem(type: CollectableType, scoreValue: number): void {
+        this._collectedCount++;
+
         const prev = this._remainingCounts[type];
         if (prev > 0) {
             this._remainingCounts[type] = prev - 1;

@@ -1,12 +1,12 @@
 /**
  * HoleGrowthService — рост дыры по порогам из LevelConfig.holeSizeThresholds.
- * Слушает ITEM_COLLECTED → пересчитывает scale → GameStore.setHoleScale → HOLE_SIZE_CHANGED.
+ * Слушает ITEM_COLLECTED → пересчитывает scale по collectedCount → GameStore.setHoleScale → HOLE_SIZE_CHANGED.
  * HoleController плавно догоняет целевой масштаб через Lerp.
  */
 
 import { EventBus, GameEvent } from './EventBus';
 import { GameStore } from './GameStore';
-import { LEVEL_CONFIG } from '../gameplay/LevelConfig';
+import { LEVEL_CONFIG, HoleSizeThreshold } from '../gameplay/LevelConfig';
 
 export interface IHoleGrowthService {
     init(): void;
@@ -33,33 +33,46 @@ class HoleGrowthServiceImpl implements IHoleGrowthService {
     }
 
     private _onItemCollected = (_payload: { score: number; totalScore: number }): void => {
-        this._recalculate(GameStore.score);
+        this._recalculate(GameStore.collectedCount);
     };
 
-    private _recalculate(totalScore: number): void {
+    private _recalculate(collectedCount: number): void {
         if (!LEVEL_CONFIG) return;
-        GameStore.setHoleScale(this._scaleFromThresholds(totalScore, LEVEL_CONFIG.holeSizeThresholds));
+
+        const prevScale = GameStore.holeScale;
+        const result = this._scaleFromThresholds(collectedCount, LEVEL_CONFIG.holeSizeThresholds);
+        GameStore.setHoleScale(result.scale);
+
+        if (result.scale > prevScale) {
+            const thr = result.threshold;
+            const thrLabel = thr
+                ? `threshold requiredCount=${thr.requiredCount}, size=${thr.size}`
+                : 'no threshold';
+            console.log(
+                `%c[HoleGrowth] size ↑ collected=${collectedCount} → ${prevScale} → ${result.scale}` +
+                ` (${thrLabel})`,
+                'color: #4FC3F7;'
+            );
+        }
     }
 
-    /** Берём порог с максимальным scoreThreshold среди достигнутых */
+    /** Берём порог с максимальным requiredCount среди достигнутых; size — абсолютный от старта */
     private _scaleFromThresholds(
-        totalScore: number,
-        thresholds: ReadonlyArray<{ scoreThreshold: number; sizeIncrease: number }>
-    ): number {
-        let bestScore = -1;
-        let sizeIncrease = 0;
-        let matched = false;
+        collectedCount: number,
+        thresholds: ReadonlyArray<HoleSizeThreshold>
+    ): { scale: number; threshold: HoleSizeThreshold | null } {
+        let bestCount = -1;
+        let best: HoleSizeThreshold | null = null;
 
         for (let i = 0; i < thresholds.length; i++) {
             const t = thresholds[i];
-            if (totalScore >= t.scoreThreshold && t.scoreThreshold >= bestScore) {
-                bestScore = t.scoreThreshold;
-                sizeIncrease = t.sizeIncrease;
-                matched = true;
+            if (collectedCount >= t.requiredCount && t.requiredCount >= bestCount) {
+                bestCount = t.requiredCount;
+                best = t;
             }
         }
 
-        return matched ? 1 + sizeIncrease : 1;
+        return best ? { scale: best.size, threshold: best } : { scale: 1, threshold: null };
     }
 }
 

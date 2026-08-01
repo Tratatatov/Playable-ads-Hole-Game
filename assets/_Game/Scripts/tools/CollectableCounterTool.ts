@@ -1,55 +1,28 @@
-import { _decorator, Component, Node, RigidBody, Collider, ERigidBodyType, Enum } from 'cc';
+/**
+ * CollectableCounterTool — editor-only инструмент заполнения CollectableContainer.
+ * Fetch counts / RigidBody / Collider, выставление типа RB.
+ * Runtime: уничтожается (не участвует в геймплее).
+ */
+
+import { _decorator, Component, RigidBody, Collider, ERigidBodyType, Enum } from 'cc';
 import { EDITOR } from 'cc/env';
 import { Collectable, CollectableType } from '../gameplay/Collectable';
+import { CollectableContainer } from '../gameplay/CollectableContainer';
 
 const { ccclass, property, executeInEditMode } = _decorator;
 
-/**
- * CollectableCounterTool — editor + runtime коллекция одного цвета.
- * Editor: fetch counts / RigidBody / Collider, выставление типа RB.
- * Runtime: НЕ уничтожается — сервис включает/выключает кэшированные RB и Collider.
- */
 @ccclass('CollectableCounterTool')
 @executeInEditMode
 export class CollectableCounterTool extends Component {
 
-    @property({ tooltip: 'Всего Collectable в parentNode' })
-    public totalCount: number = 0;
+    @property({
+        type: CollectableContainer,
+        tooltip: 'Контейнер данных. Если пусто — берётся CollectableContainer на этом же узле.',
+    })
+    public container: CollectableContainer = null!;
 
-    @property({ tooltip: 'Blue' })
-    public blueCount: number = 0;
-
-    @property({ tooltip: 'Red' })
-    public redCount: number = 0;
-
-    @property({ tooltip: 'Green' })
-    public greenCount: number = 0;
-
-    @property({ tooltip: 'Teal' })
-    public tealCount: number = 0;
-
-    @property({ type: Node, tooltip: 'Узел, в котором искать Collectable / физику' })
-    public parentNode: Node = null!;
-
-    /**
-     * Prefab-инстансы при Play сбрасывают type к ассету.
-     * Значение сериализуется на tool и заново применяется в onLoad.
-     */
-    @property({ type: Enum(ERigidBodyType), tooltip: 'Тип RigidBody, который применяется при Play' })
+    @property({ type: Enum(ERigidBodyType), tooltip: 'Тип RigidBody, который пишется в container при set*Button' })
     public rigidBodyTypeOnPlay: ERigidBodyType = ERigidBodyType.STATIC;
-
-    @property({ type: [RigidBody], tooltip: 'Кэш RigidBody (Fetch Physics). Используется сервисом в runtime.' })
-    public rigidBodies: RigidBody[] = [];
-
-    @property({ type: [Collider], tooltip: 'Кэш Collider (Fetch Physics). Используется сервисом в runtime.' })
-    public colliders: Collider[] = [];
-
-    private _physicsActive: boolean = true;
-
-    /** Текущее состояние физики коллекции (после activate/deactivate) */
-    public get isPhysicsActive(): boolean {
-        return this._physicsActive;
-    }
 
     @property({ tooltip: 'Нажмите, чтобы пересчитать Collectable по типам' })
     public get fetchButton(): boolean {
@@ -61,7 +34,7 @@ export class CollectableCounterTool extends Component {
         }
     }
 
-    @property({ tooltip: 'Нажмите, чтобы собрать child RigidBody и Collider в кэш' })
+    @property({ tooltip: 'Нажмите, чтобы собрать child RigidBody и Collider в кэш контейнера' })
     public get fetchPhysicsButton(): boolean {
         return false;
     }
@@ -82,7 +55,7 @@ export class CollectableCounterTool extends Component {
         }
     }
 
-    @property({ tooltip: 'Нажмите, чтобы выставить Static всем RigidBody в дочерних объектах' })
+    @property({ tooltip: 'Нажмите, чтобы выставить Static всем RigidBody' })
     public get setStaticButton(): boolean {
         return false;
     }
@@ -93,7 +66,7 @@ export class CollectableCounterTool extends Component {
         }
     }
 
-    @property({ tooltip: 'Нажмите, чтобы выставить Dynamic всем RigidBody в дочерних объектах' })
+    @property({ tooltip: 'Нажмите, чтобы выставить Dynamic всем RigidBody' })
     public get setDynamicButton(): boolean {
         return false;
     }
@@ -104,7 +77,7 @@ export class CollectableCounterTool extends Component {
         }
     }
 
-    @property({ tooltip: 'Нажмите, чтобы выставить Kinematic всем RigidBody в дочерних объектах' })
+    @property({ tooltip: 'Нажмите, чтобы выставить Kinematic всем RigidBody' })
     public get setKinematicButton(): boolean {
         return false;
     }
@@ -117,35 +90,34 @@ export class CollectableCounterTool extends Component {
 
     onLoad(): void {
         if (!EDITOR) {
-            // Prefab overrides сбрасывают type — применяем сохранённый
-            this.setChildrenRigidBodiesType(this.rigidBodyTypeOnPlay);
-            // Если дизайнер забыл Fetch Physics — добрать на старте
-            if (this.rigidBodies.length === 0 || this.colliders.length === 0) {
-                this.fetchPhysicsComponents();
-            }
-            // По умолчанию выключены; CollectableCollectionService включит initialActive
-            this.setPhysicsActive(false);
-            // НЕ destroy: runtime-сервис держит ссылки на этот tool
+            this.destroy();
+            return;
         }
     }
 
-    /** Счётчики по типам (для синхронизации в LevelConfig) */
-    public getCounts(): Record<CollectableType, number> {
-        return {
-            [CollectableType.Blue]: this.blueCount,
-            [CollectableType.Red]: this.redCount,
-            [CollectableType.Green]: this.greenCount,
-            [CollectableType.Teal]: this.tealCount,
-        };
+    private _resolveContainer(): CollectableContainer | null {
+        if (this.container && this.container.isValid) {
+            return this.container;
+        }
+        const local = this.getComponent(CollectableContainer);
+        if (local) {
+            this.container = local;
+            return local;
+        }
+        console.warn('[CollectableCounterTool] Не найден CollectableContainer (свойство container или на этом узле)');
+        return null;
     }
 
     public fetchCollectables(): void {
-        if (!this.parentNode) {
-            console.warn('[CollectableCounterTool] Укажите parentNode для поиска!');
+        const c = this._resolveContainer();
+        if (!c) return;
+
+        if (!c.parentNode) {
+            console.warn('[CollectableCounterTool] Укажите parentNode на CollectableContainer!');
             return;
         }
 
-        const collectables = this.parentNode.getComponentsInChildren(Collectable);
+        const collectables = c.parentNode.getComponentsInChildren(Collectable);
         let blue = 0;
         let red = 0;
         let green = 0;
@@ -160,70 +132,52 @@ export class CollectableCounterTool extends Component {
             }
         }
 
-        this.blueCount = blue;
-        this.redCount = red;
-        this.greenCount = green;
-        this.tealCount = teal;
-        this.totalCount = collectables.length;
+        c.blueCount = blue;
+        c.redCount = red;
+        c.greenCount = green;
+        c.tealCount = teal;
+        c.totalCount = collectables.length;
 
         console.log(
-            `[CollectableCounterTool] Найдено: total=${this.totalCount}` +
+            `[CollectableCounterTool] Найдено: total=${c.totalCount}` +
             ` Blue=${blue} Red=${red} Green=${green} Teal=${teal}`
         );
     }
 
-    /** Собирает RigidBody и Collider из parentNode (editor / runtime fallback) */
     public fetchPhysicsComponents(): void {
-        if (!this.parentNode) {
-            console.warn('[CollectableCounterTool] Укажите parentNode для поиска!');
+        const c = this._resolveContainer();
+        if (!c) return;
+
+        if (!c.parentNode) {
+            console.warn('[CollectableCounterTool] Укажите parentNode на CollectableContainer!');
             return;
         }
 
-        const bodies = this.parentNode.getComponentsInChildren(RigidBody);
-        const cols = this.parentNode.getComponentsInChildren(Collider);
+        const bodies = c.parentNode.getComponentsInChildren(RigidBody);
+        const cols = c.parentNode.getComponentsInChildren(Collider);
 
-        this.rigidBodies = bodies.slice();
-        this.colliders = cols.slice();
+        c.rigidBodies = bodies.slice();
+        c.colliders = cols.slice();
 
         console.log(
-            `[CollectableCounterTool] Physics cache: RigidBody=${this.rigidBodies.length}, Collider=${this.colliders.length}`
+            `[CollectableCounterTool] Physics cache: RigidBody=${c.rigidBodies.length}, Collider=${c.colliders.length}`
         );
     }
 
-    /**
-     * Включает/выключает все закэшированные RigidBody и Collider.
-     * Вызывается CollectableCollectionService.
-     */
-    public setPhysicsActive(active: boolean): void {
-        this._physicsActive = active;
-
-        const bodies = this.rigidBodies;
-        for (let i = 0; i < bodies.length; i++) {
-            const body = bodies[i];
-            if (body && body.isValid) {
-                body.enabled = active;
-            }
-        }
-
-        const cols = this.colliders;
-        for (let i = 0; i < cols.length; i++) {
-            const col = cols[i];
-            if (col && col.isValid) {
-                col.enabled = active;
-            }
-        }
-    }
-
-    /** Обходит дочерние узлы parentNode и ставит RigidBody.type */
     public setChildrenRigidBodiesType(type: ERigidBodyType): void {
-        if (!this.parentNode) {
-            console.warn('[CollectableCounterTool] Укажите parentNode для поиска!');
+        const c = this._resolveContainer();
+        if (!c) return;
+
+        if (!c.parentNode) {
+            console.warn('[CollectableCounterTool] Укажите parentNode на CollectableContainer!');
             return;
         }
 
-        const bodies = this.rigidBodies.length > 0
-            ? this.rigidBodies
-            : this.parentNode.getComponentsInChildren(RigidBody);
+        c.rigidBodyTypeOnPlay = type;
+
+        const bodies = c.rigidBodies.length > 0
+            ? c.rigidBodies
+            : c.parentNode.getComponentsInChildren(RigidBody);
 
         let changed = 0;
         const typeName =

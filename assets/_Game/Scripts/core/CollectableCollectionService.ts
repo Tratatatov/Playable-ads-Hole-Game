@@ -1,39 +1,37 @@
 /**
- * CollectableCollectionService — включает/выключает физику коллекций по цвету.
- * Ссылки на CollectableCounterTool берутся из LevelConfig.
- * При старте: все inactive, кроме initialActiveCollection.
- * При DOOR_OPENED: активирует следующую коллекцию (Blue→Red→Green→Teal).
+ * CollectableCollectionService — включает/выключает физику коллекций.
+ * Ссылки на CollectableContainer — из LevelConfig.collection*.
+ * Старт / следующий цвет — из LevelConfig.collectionProgression.
+ * Батчевая активация (Z ↓) — внутри CollectableContainer.
  */
 
 import { EventBus, GameEvent } from './EventBus';
 import { CollectableType } from '../gameplay/Collectable';
+import { CollectableContainer } from '../gameplay/CollectableContainer';
 import { LEVEL_CONFIG } from '../gameplay/LevelConfig';
-import { CollectableCounterTool } from '../tools/CollectableCounterTool';
+import { BATCHING_CONFIG } from '../gameplay/BatchingConfig';
 
 export interface ICollectableCollectionService {
     init(): void;
     destroy(): void;
-    activate(tool: CollectableCounterTool | null): void;
-    deactivate(tool: CollectableCounterTool | null): void;
+    activate(container: CollectableContainer | null): void;
+    deactivate(container: CollectableContainer | null): void;
     activateByType(type: CollectableType): void;
     deactivateByType(type: CollectableType): void;
     deactivateAll(): void;
-    getTool(type: CollectableType): CollectableCounterTool | null;
+    getContainer(type: CollectableType): CollectableContainer | null;
 }
 
-const NEXT_TYPE: Partial<Record<CollectableType, CollectableType>> = {
-    [CollectableType.Blue]: CollectableType.Red,
-    [CollectableType.Red]: CollectableType.Green,
-    [CollectableType.Green]: CollectableType.Teal,
-};
-
 class CollectableCollectionServiceImpl implements ICollectableCollectionService {
-    private _byType: Partial<Record<CollectableType, CollectableCounterTool | null>> = {};
+    private _byType: Partial<Record<CollectableType, CollectableContainer | null>> = {};
+    private _allContainers: CollectableContainer[] = [];
     private _subscribed: boolean = false;
 
     init(): void {
+        console.log('[CollectableCollectionService] === INIT START ===');
+
         if (!LEVEL_CONFIG) {
-            console.warn('[CollectableCollectionService] LEVEL_CONFIG не задан');
+            console.warn('[CollectableCollectionService] LEVEL_CONFIG не задан — abort');
             return;
         }
 
@@ -44,10 +42,35 @@ class CollectableCollectionServiceImpl implements ICollectableCollectionService 
             [CollectableType.Teal]: LEVEL_CONFIG.collectionTeal,
         };
 
-        // Все выключаем, затем включаем стартовую коллекцию
+        this._logRef('collectionBlue', LEVEL_CONFIG.collectionBlue);
+        this._logRef('collectionRed', LEVEL_CONFIG.collectionRed);
+        this._logRef('collectionGreen', LEVEL_CONFIG.collectionGreen);
+        this._logRef('collectionTeal', LEVEL_CONFIG.collectionTeal);
+        const progression = LEVEL_CONFIG.collectionProgression || [];
+        console.log(
+            `[CollectableCollectionService] progression (${progression.length}): [` +
+            progression.map((c) => (c && c.isValid ? c.node.name : '?')).join(' → ') +
+            ']'
+        );
+
+        this._allContainers = this._collectAllContainers();
+        console.log(
+            `[CollectableCollectionService] Уникальных контейнеров: ${this._allContainers.length}`
+        );
+
+        for (let i = 0; i < this._allContainers.length; i++) {
+            const c = this._allContainers[i];
+            this._prepareContainer(c);
+            console.log(
+                `[CollectableCollectionService] prepare "${c.node.name}": ` +
+                `RB=${c.rigidBodies.length}, Col=${c.colliders.length}, ` +
+                `parent=${c.parentNode ? c.parentNode.name : 'NULL'}`
+            );
+        }
+
         this.deactivateAll();
 
-        const initial = LEVEL_CONFIG.initialActiveCollection;
+        const initial = LEVEL_CONFIG.getInitialCollection();
         if (initial) {
             this.activate(initial);
             console.log(
@@ -55,14 +78,28 @@ class CollectableCollectionServiceImpl implements ICollectableCollectionService 
             );
         } else {
             console.warn(
-                '[CollectableCollectionService] initialActiveCollection не назначен — все коллекции inactive'
+                '[CollectableCollectionService] collectionProgression пуст / контейнер не найден — все inactive'
             );
         }
 
         if (!this._subscribed) {
             EventBus.on(GameEvent.DOOR_OPENED, this._onDoorOpened, this);
             this._subscribed = true;
+            console.log('[CollectableCollectionService] Подписка на DOOR_OPENED');
         }
+
+        if (BATCHING_CONFIG) {
+            console.log(
+                `[CollectableCollectionService] BatchingConfig: ` +
+                `batchSize=${BATCHING_CONFIG.batchSize}, intervalFrames=${BATCHING_CONFIG.intervalFrames}`
+            );
+        } else {
+            console.warn(
+                '[CollectableCollectionService] BatchingConfig не задан — defaults 10 / 2f'
+            );
+        }
+
+        console.log('[CollectableCollectionService] === INIT DONE ===');
     }
 
     destroy(): void {
@@ -71,62 +108,122 @@ class CollectableCollectionServiceImpl implements ICollectableCollectionService 
             this._subscribed = false;
         }
         this._byType = {};
+        this._allContainers = [];
+        console.log('[CollectableCollectionService] destroy()');
     }
 
-    activate(tool: CollectableCounterTool | null): void {
-        if (!tool || !tool.isValid) return;
-        tool.setPhysicsActive(true);
+    activate(container: CollectableContainer | null): void {
+        if (!container) {
+            console.warn('[CollectableCollectionService] ACTIVATE: container=null — skip');
+            return;
+        }
+        if (!container.isValid) {
+            console.warn('[CollectableCollectionService] ACTIVATE: container invalid — skip');
+            return;
+        }
+        const wakePct = LEVEL_CONFIG ? LEVEL_CONFIG.wakeUpPercent : 33;
+        container.activate(wakePct);
     }
 
-    deactivate(tool: CollectableCounterTool | null): void {
-        if (!tool || !tool.isValid) return;
-        tool.setPhysicsActive(false);
+    deactivate(container: CollectableContainer | null): void {
+        if (!container) {
+            console.warn('[CollectableCollectionService] DEACTIVATE: container=null — skip');
+            return;
+        }
+        if (!container.isValid) {
+            console.warn('[CollectableCollectionService] DEACTIVATE: container invalid — skip');
+            return;
+        }
+        container.deactivate();
     }
 
     activateByType(type: CollectableType): void {
-        this.activate(this.getTool(type));
+        this.activate(this.getContainer(type));
     }
 
     deactivateByType(type: CollectableType): void {
-        this.deactivate(this.getTool(type));
+        this.deactivate(this.getContainer(type));
     }
 
     deactivateAll(): void {
-        const types = [
-            CollectableType.Blue,
-            CollectableType.Red,
-            CollectableType.Green,
-            CollectableType.Teal,
-        ];
-        for (let i = 0; i < types.length; i++) {
-            this.deactivate(this._byType[types[i]] ?? null);
+        console.log(
+            `[CollectableCollectionService] deactivateAll (${this._allContainers.length} шт.)`
+        );
+        for (let i = 0; i < this._allContainers.length; i++) {
+            this.deactivate(this._allContainers[i]);
         }
     }
 
-    getTool(type: CollectableType): CollectableCounterTool | null {
+    getContainer(type: CollectableType): CollectableContainer | null {
         return this._byType[type] ?? null;
     }
 
-    /** После открытия двери активируем следующую цветовую коллекцию */
-    private _onDoorOpened = (payload: { type: CollectableType }): void => {
-        const next = NEXT_TYPE[payload.type];
-        if (next === undefined) return;
+    private _collectAllContainers(): CollectableContainer[] {
+        const result: CollectableContainer[] = [];
+        const seen = new Set<CollectableContainer>();
 
-        const tool = this.getTool(next);
-        if (!tool) {
+        const push = (c: CollectableContainer | null | undefined): void => {
+            if (!c || !c.isValid || seen.has(c)) return;
+            seen.add(c);
+            result.push(c);
+        };
+
+        push(LEVEL_CONFIG.collectionBlue);
+        push(LEVEL_CONFIG.collectionRed);
+        push(LEVEL_CONFIG.collectionGreen);
+        push(LEVEL_CONFIG.collectionTeal);
+
+        return result;
+    }
+
+    private _prepareContainer(container: CollectableContainer | null): void {
+        if (!container || !container.isValid) return;
+
+        container.ensurePhysicsCache();
+        container.applyRigidBodyType(container.rigidBodyTypeOnPlay);
+    }
+
+    private _onDoorOpened = (payload: { type: CollectableType }): void => {
+        const typeName = CollectableType[payload.type];
+        console.log(
+            `[CollectableCollectionService] <<< DOOR_OPENED type=${typeName} (${payload.type})`
+        );
+
+        if (!LEVEL_CONFIG) {
+            console.warn('[CollectableCollectionService] DOOR_OPENED: LEVEL_CONFIG=null');
+            return;
+        }
+
+        const container = LEVEL_CONFIG.getActivateAfter(payload.type);
+        this._logRef(`next after ${typeName}`, container);
+
+        if (!container || !container.isValid) {
             console.warn(
-                `[CollectableCollectionService] Дверь ${CollectableType[payload.type]} открыта, ` +
-                `но коллекция ${CollectableType[next]} не назначена в LevelConfig`
+                `[CollectableCollectionService] После ${typeName} в progression нет следующего — ничего не активируем`
             );
             return;
         }
 
-        this.activate(tool);
+        this.activate(container);
         console.log(
-            `[CollectableCollectionService] Активирована коллекция ${CollectableType[next]} ` +
-            `("${tool.node.name}") после двери ${CollectableType[payload.type]}`
+            `[CollectableCollectionService] >>> next after ${typeName} → "${container.node.name}" started (batched)`
         );
     };
+
+    private _logRef(label: string, c: CollectableContainer | null | undefined): void {
+        if (!c) {
+            console.log(`[CollectableCollectionService] ${label}: null`);
+            return;
+        }
+        if (!c.isValid) {
+            console.log(`[CollectableCollectionService] ${label}: INVALID`);
+            return;
+        }
+        console.log(
+            `[CollectableCollectionService] ${label}: "${c.node.name}" ` +
+            `(uuid=${c.node.uuid}, RB=${c.rigidBodies?.length ?? 0}, Col=${c.colliders?.length ?? 0})`
+        );
+    }
 }
 
 export let CollectableCollectionService: ICollectableCollectionService =

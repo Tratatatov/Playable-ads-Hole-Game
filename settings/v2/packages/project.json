@@ -29,7 +29,8 @@
       "2": 3,
       "3": 9
     },
-    "fixedTimeStep": 0.02
+    "fixedTimeStep": 0.02,
+    "sleepThreshold": 0.4
   },
   "sorting-layer": {
     "layers": [

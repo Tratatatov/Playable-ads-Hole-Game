@@ -10,10 +10,7 @@
   },
   "_techIdx": 0,
   "_defines": [
-    {
-      "USE_INSTANCING": true,
-      "USE_ALBEDO_MAP": true
-    },
+    {},
     {},
     {},
     {},
@@ -22,8 +19,18 @@
   ],
   "_states": [
     {
+      "priority": 130,
       "rasterizerState": {},
-      "depthStencilState": {},
+      "depthStencilState": {
+        "stencilTestFront": true,
+        "stencilFuncFront": 2,
+        "stencilReadMaskFront": 255,
+        "stencilWriteMaskFront": 0,
+        "stencilTestBack": true,
+        "stencilFuncBack": 2,
+        "stencilReadMaskBack": 255,
+        "stencilWriteMaskBack": 0
+      },
       "blendState": {
         "targets": [
           {}
@@ -78,12 +85,15 @@
   ],
   "_props": [
     {
-      "roughness": 0.722,
-      "specularIntensity": 0.668,
-      "mainTexture": {
-        "__uuid__": "ac64fee8-ec9d-45ea-a5b7-03db03ca7d4b@6c48a",
-        "__expectedType__": "cc.Texture2D"
-      }
+      "mainColor": {
+        "__type__": "cc.Color",
+        "r": 178,
+        "g": 47,
+        "b": 219,
+        "a": 255
+      },
+      "occlusion": 0.127,
+      "metallic": 1
     },
     {},
     {},

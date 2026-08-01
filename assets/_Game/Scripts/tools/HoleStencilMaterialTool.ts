@@ -54,6 +54,11 @@ export class HoleStencilMaterialTool extends Component {
     @property({ tooltip: 'Priority Interior (после пола)' })
     public interiorPriority = 130;
 
+    @property({
+        tooltip: 'Тестировать back-faces (нужен true, если Mask/пол рисуются задней стороной)',
+    })
+    public stencilTestBack = true;
+
     @property({ tooltip: 'Цвет бездны / стенок (Interior)' })
     public interiorColor: Color = new Color(0, 0, 0, 255);
 
@@ -203,11 +208,11 @@ export class HoleStencilMaterialTool extends Component {
                 depthTest: true,
                 depthWrite: false,
                 stencilTestFront: true,
-                stencilTestBack: true,
+                stencilTestBack: this.stencilTestBack,
                 stencilFuncFront: gfx.ComparisonFunc.ALWAYS,
                 stencilFuncBack: gfx.ComparisonFunc.ALWAYS,
                 stencilPassOpFront: gfx.StencilOp.REPLACE,
-                stencilPassOpBack: gfx.StencilOp.REPLACE,
+                stencilPassOpBack: this.stencilTestBack ? gfx.StencilOp.REPLACE : gfx.StencilOp.KEEP,
                 stencilFailOpFront: gfx.StencilOp.KEEP,
                 stencilFailOpBack: gfx.StencilOp.KEEP,
                 stencilZFailOpFront: gfx.StencilOp.KEEP,
@@ -216,8 +221,8 @@ export class HoleStencilMaterialTool extends Component {
                 stencilRefBack: ref,
                 stencilReadMaskFront: 0xff,
                 stencilWriteMaskFront: 0xff,
-                stencilReadMaskBack: 0xff,
-                stencilWriteMaskBack: 0xff,
+                stencilReadMaskBack: this.stencilTestBack ? 0xff : 0,
+                stencilWriteMaskBack: this.stencilTestBack ? 0xff : 0,
             },
             blendColorMask: gfx.ColorMask.NONE,
             props: {},
@@ -235,7 +240,7 @@ export class HoleStencilMaterialTool extends Component {
                 depthTest: true,
                 depthWrite: true,
                 stencilTestFront: true,
-                stencilTestBack: true,
+                stencilTestBack: this.stencilTestBack,
                 stencilFuncFront: gfx.ComparisonFunc.EQUAL,
                 stencilFuncBack: gfx.ComparisonFunc.EQUAL,
                 stencilPassOpFront: gfx.StencilOp.KEEP,
@@ -248,7 +253,7 @@ export class HoleStencilMaterialTool extends Component {
                 stencilRefBack: ref,
                 stencilReadMaskFront: 0xff,
                 stencilWriteMaskFront: 0,
-                stencilReadMaskBack: 0xff,
+                stencilReadMaskBack: this.stencilTestBack ? 0xff : 0,
                 stencilWriteMaskBack: 0,
             },
             blendColorMask: gfx.ColorMask.ALL,
@@ -276,7 +281,7 @@ export class HoleStencilMaterialTool extends Component {
                 depthTest: true,
                 depthWrite: true,
                 stencilTestFront: true,
-                stencilTestBack: true,
+                stencilTestBack: this.stencilTestBack,
                 stencilFuncFront: gfx.ComparisonFunc.NOT_EQUAL,
                 stencilFuncBack: gfx.ComparisonFunc.NOT_EQUAL,
                 stencilPassOpFront: gfx.StencilOp.KEEP,
@@ -289,7 +294,7 @@ export class HoleStencilMaterialTool extends Component {
                 stencilRefBack: ref,
                 stencilReadMaskFront: 0xff,
                 stencilWriteMaskFront: 0,
-                stencilReadMaskBack: 0xff,
+                stencilReadMaskBack: this.stencilTestBack ? 0xff : 0,
                 stencilWriteMaskBack: 0,
             },
             blendColorMask: gfx.ColorMask.ALL,
