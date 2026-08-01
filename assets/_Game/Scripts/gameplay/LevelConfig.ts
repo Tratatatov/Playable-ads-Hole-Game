@@ -48,6 +48,9 @@ export class LevelConfig extends Component {
     totalTime: number = 60;
 
     // ── Коллектаблы ────────────────────────────────────────────────────
+    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Задавать случайный угол поворота по 3 осям при спавне/инициализации' })
+    SetRandomAngle: boolean = false;
+
     @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Кол-во предметов на сцене одновременно' })
     collectableCount: number = 25;
 
@@ -103,9 +106,6 @@ export class LevelConfig extends Component {
 
     @property({ group: { name: 'UI Settings', id: '5' } })
     endCardPopScale: number = 0.7;
-
-    @property({ group: { name: 'UI Settings', id: '5' } })
-    endCardAnimTime: number = 0.35;
 
     // ── Камера ─────────────────────────────────────────────────────────
     @property({ group: { name: 'Camera Settings', id: '6' } })

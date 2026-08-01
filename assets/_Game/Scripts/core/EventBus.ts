@@ -4,6 +4,7 @@
  * Прямые зависимости между компонентами запрещены (RULES §1.1).
  */
 import { GameState } from './GameState';
+import { CollectableType } from '../gameplay/Collectable';
 
 /** Перечень всех игровых событий */
 export const enum GameEvent {
@@ -16,6 +17,7 @@ export const enum GameEvent {
     // Progression
     SCORE_CHANGED       = 'score_changed',
     HOLE_SIZE_CHANGED   = 'hole_size_changed',
+    REMAINING_CHANGED   = 'remaining_changed',
     // Timer
     TIMER_TICK          = 'timer_tick',
     TIMER_EXPIRED       = 'timer_expired',
@@ -31,6 +33,7 @@ export interface EventPayloadMap {
     [GameEvent.ITEM_COLLECTED]:    { score: number; totalScore: number };
     [GameEvent.SCORE_CHANGED]:     { score: number };
     [GameEvent.HOLE_SIZE_CHANGED]: { scale: number };
+    [GameEvent.REMAINING_CHANGED]: { counts: Record<CollectableType, number> };
     [GameEvent.TIMER_TICK]:        { timeLeft: number };
     [GameEvent.TIMER_EXPIRED]:     null;
     [GameEvent.FIRST_TOUCH]:       null;
