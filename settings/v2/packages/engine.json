@@ -21,7 +21,7 @@
             "_value": true
           },
           "skeletal-animation": {
-            "_value": true
+            "_value": false
           },
           "3d": {
             "_value": true
@@ -36,16 +36,16 @@
             "_value": false
           },
           "rich-text": {
-            "_value": true
+            "_value": false
           },
           "mask": {
-            "_value": true
+            "_value": false
           },
           "graphics": {
-            "_value": true
+            "_value": false
           },
           "ui-skew": {
-            "_value": true
+            "_value": false
           },
           "affine-transform": {
             "_value": true
@@ -79,11 +79,11 @@
             "_value": false
           },
           "physics-2d": {
-            "_value": true,
+            "_value": false,
             "_option": "physics-2d-box2d"
           },
           "physics-2d-box2d": {
-            "_value": true
+            "_value": false
           },
           "physics-2d-box2d-wasm": {
             "_value": false,
@@ -98,25 +98,25 @@
             "_value": false
           },
           "intersection-2d": {
-            "_value": true
+            "_value": false
           },
           "primitive": {
-            "_value": true
+            "_value": false
           },
           "profiler": {
-            "_value": true
+            "_value": false
           },
           "occlusion-query": {
             "_value": false
           },
           "geometry-renderer": {
-            "_value": true
+            "_value": false
           },
           "debug-renderer": {
             "_value": false
           },
           "particle-2d": {
-            "_value": true
+            "_value": false
           },
           "audio": {
             "_value": true
@@ -125,35 +125,35 @@
             "_value": false
           },
           "webview": {
-            "_value": true
+            "_value": false
           },
           "tween": {
             "_value": true
           },
           "websocket": {
-            "_value": true
+            "_value": false
           },
           "websocket-server": {
             "_value": false
           },
           "terrain": {
-            "_value": true
+            "_value": false
           },
           "light-probe": {
-            "_value": true
+            "_value": false
           },
           "tiled-map": {
-            "_value": true
+            "_value": false
           },
           "vendor-google": {
             "_value": false
           },
           "spine": {
-            "_value": true,
+            "_value": false,
             "_option": "spine-3.8"
           },
           "spine-3.8": {
-            "_value": true,
+            "_value": false,
             "_flags": {
               "LOAD_SPINE_MANUALLY": false
             }
@@ -165,10 +165,10 @@
             }
           },
           "dragon-bones": {
-            "_value": true
+            "_value": false
           },
           "marionette": {
-            "_value": true
+            "_value": false
           },
           "procedural-animation": {
             "_value": false
@@ -202,30 +202,11 @@
           "audio",
           "base",
           "custom-pipeline",
-          "dragon-bones",
           "gfx-webgl",
-          "geometry-renderer",
-          "graphics",
-          "intersection-2d",
-          "light-probe",
-          "marionette",
-          "mask",
           "particle",
-          "particle-2d",
-          "physics-2d-box2d",
           "physics-ammo",
-          "primitive",
-          "profiler",
-          "rich-text",
-          "skeletal-animation",
-          "spine-3.8",
-          "terrain",
-          "tiled-map",
           "tween",
-          "ui",
-          "ui-skew",
-          "websocket",
-          "webview"
+          "ui"
         ],
         "noDeprecatedFeatures": {
           "value": false,
