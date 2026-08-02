@@ -1,68 +1,107 @@
-import { Node, UIOpacity, tween, Vec3 } from 'cc';
-import { LEVEL_CONFIG } from '../gameplay/LevelConfig';
+import { Node, UIOpacity, tween, Tween } from 'cc';
+import { TutorialFinger } from './TutorialFinger';
 
+/**
+ * TutorialView — TutorialSprite (∞) + TutorialFinger.
+ * Fade обоих через UIOpacity; движение пальца — TutorialFinger.play().
+ */
 export class TutorialView {
-    private _fingerNode: Node | null = null;
-    private _panel: Node | null = null;
-    private _panelOpacity: UIOpacity | null = null;
+    private _finger: TutorialFinger | null = null;
+    private _spriteNode: Node | null = null;
+    private _spriteOpacity: UIOpacity | null = null;
+    private _spriteFadeTween: Tween<UIOpacity> | null = null;
 
-    /** Scratch для анимации пальца */
-    private readonly _fingerFrom: Vec3 = new Vec3(-30, 0, 0);
-    private readonly _fingerTo:   Vec3 = new Vec3( 30, 0, 0);
-    private _fingerTween: ReturnType<typeof tween> | null = null;
-
-    constructor(fingerNode: Node, panel: Node, panelOpacity: UIOpacity) {
-        this._fingerNode = fingerNode;
-        this._panel = panel;
-        this._panelOpacity = panelOpacity;
-
-        this._fingerFrom.set(-LEVEL_CONFIG.tutorialFingerRange, 0, 0);
-        this._fingerTo.set(LEVEL_CONFIG.tutorialFingerRange, 0, 0);
-    }
-
-    public show(): void {
-        if (this._panel) this._panel.active = true;
-        if (this._panelOpacity) this._panelOpacity.opacity = 255;
-        this._startFingerAnim();
-    }
-
-    /** Мгновенное скрытие без анимации (boot / destroy) */
-    public hideImmediate(): void {
-        this._fingerTween?.stop();
-        this._fingerTween = null;
-        if (this._panel) this._panel.active = false;
-        if (this._panelOpacity) this._panelOpacity.opacity = 0;
-    }
-
-    public hide(): void {
-        this._fingerTween?.stop();
-        this._fingerTween = null;
-        if (!this._panel) return;
-
-        if (this._panelOpacity) {
-            tween(this._panelOpacity)
-                .to(0.25, { opacity: 0 })
-                .call(() => { if (this._panel) this._panel.active = false; })
-                .start();
-        } else {
-            this._panel.active = false;
+    constructor(finger: TutorialFinger, spriteNode: Node | null) {
+        this._finger = finger;
+        this._spriteNode = spriteNode;
+        if (spriteNode) {
+            this._spriteOpacity =
+                spriteNode.getComponent(UIOpacity) ?? spriteNode.addComponent(UIOpacity);
         }
     }
 
-    public stopAnimations(): void {
-        this._fingerTween?.stop();
-        this._fingerTween = null;
+    public get hintActiveSeconds(): number {
+        return this._finger?.hintActiveSeconds ?? 5;
     }
 
-    private _startFingerAnim(): void {
-        if (!this._fingerNode) return;
-        this._fingerTween?.stop();
-        this._fingerNode.setPosition(this._fingerFrom);
-        this._fingerTween = tween(this._fingerNode)
-            .to(LEVEL_CONFIG.tutorialAnimTime, { position: this._fingerTo  }, { easing: 'sineInOut' })
-            .to(LEVEL_CONFIG.tutorialAnimTime, { position: this._fingerFrom }, { easing: 'sineInOut' })
-            .union()
-            .repeatForever()
+    public get fadeDuration(): number {
+        return this._finger?.fadeDuration ?? 0.3;
+    }
+
+    /** Показать ∞ + палец (fade in) и запустить движение. */
+    public show(): void {
+        this._finger?.play();
+        this._fadeSpriteIn();
+        this._finger?.fadeIn();
+    }
+
+    /** Скрыть при таче (fade out), движение пальца продолжает крутиться. */
+    public fadeOutOnTouch(): void {
+        this._fadeSpriteOut();
+        this._finger?.fadeOut();
+    }
+
+    /** Снова показать после отпускания (fade in). */
+    public fadeInOnRelease(): void {
+        this._fadeSpriteIn();
+        this._finger?.fadeIn();
+    }
+
+    /** Окончательно скрыть (конец окна 5с / destroy). */
+    public hidePermanent(): void {
+        this._fadeSpriteOut(() => {
+            if (this._spriteNode) this._spriteNode.active = false;
+        });
+        this._finger?.fadeOut(() => {
+            this._finger?.stopMove();
+            if (this._finger?.node) this._finger.node.active = false;
+        });
+    }
+
+    /** Мгновенное скрытие без анимации (boot / destroy). */
+    public hideImmediate(): void {
+        this._stopSpriteFade();
+        this._finger?.hideImmediate();
+        if (this._spriteOpacity) this._spriteOpacity.opacity = 0;
+        if (this._spriteNode) this._spriteNode.active = false;
+    }
+
+    public stopAnimations(): void {
+        this._stopSpriteFade();
+        this._finger?.stop();
+    }
+
+    private _fadeSpriteIn(): void {
+        if (!this._spriteNode || !this._spriteOpacity) return;
+        this._stopSpriteFade();
+        this._spriteNode.active = true;
+        const duration = Math.max(0.01, this.fadeDuration);
+        this._spriteFadeTween = tween(this._spriteOpacity)
+            .to(duration, { opacity: 255 }, { easing: 'sineOut' })
+            .call(() => { this._spriteFadeTween = null; })
             .start();
+    }
+
+    private _fadeSpriteOut(onComplete?: () => void): void {
+        if (!this._spriteNode || !this._spriteOpacity) {
+            if (onComplete) onComplete();
+            return;
+        }
+        this._stopSpriteFade();
+        const duration = Math.max(0.01, this.fadeDuration);
+        this._spriteFadeTween = tween(this._spriteOpacity)
+            .to(duration, { opacity: 0 }, { easing: 'sineIn' })
+            .call(() => {
+                this._spriteFadeTween = null;
+                if (onComplete) onComplete();
+            })
+            .start();
+    }
+
+    private _stopSpriteFade(): void {
+        if (this._spriteFadeTween) {
+            this._spriteFadeTween.stop();
+            this._spriteFadeTween = null;
+        }
     }
 }

@@ -31,6 +31,12 @@ export const enum GameEvent {
     TIMER_EXPIRED       = 'timer_expired',
     // Input
     FIRST_TOUCH         = 'first_touch',
+    TOUCH_START         = 'touch_start',
+    TOUCH_END           = 'touch_end',
+    // Camera intro A→B finished
+    CAMERA_INTRO_COMPLETE = 'camera_intro_complete',
+    // Praise / Perfect message (каждые N собранных)
+    PERFECT_MESSAGE     = 'perfect_message',
 }
 
 /** Данные событий */
@@ -50,7 +56,11 @@ export interface EventPayloadMap {
     [GameEvent.GATE_TOUCHED]:      null;
     [GameEvent.TIMER_TICK]:        { timeLeft: number };
     [GameEvent.TIMER_EXPIRED]:     null;
-    [GameEvent.FIRST_TOUCH]:       null;
+    [GameEvent.FIRST_TOUCH]:            null;
+    [GameEvent.TOUCH_START]:            null;
+    [GameEvent.TOUCH_END]:              null;
+    [GameEvent.CAMERA_INTRO_COMPLETE]:  null;
+    [GameEvent.PERFECT_MESSAGE]:        { collectedCount: number };
 }
 
 type Listener<E extends GameEvent> = (payload: EventPayloadMap[E]) => void;
@@ -69,6 +79,12 @@ export interface IEventBus {
 
 class EventBusImpl implements IEventBus {
     private readonly _listeners: Map<string, ListenerEntry[]> = new Map();
+    /**
+     * Стек scratch-буферов: вложенный emit (ITEM_COLLECTED → HOLE_SIZE_CHANGED)
+     * не должен перетирать копию слушателей внешнего emit.
+     */
+    private readonly _emitStack: ListenerEntry[][] = [[]];
+    private _emitDepth: number = 0;
 
     on<E extends GameEvent>(event: E, listener: Listener<E>, ctx?: unknown): void {
         let arr = this._listeners.get(event);
@@ -88,11 +104,35 @@ class EventBusImpl implements IEventBus {
 
     emit<E extends GameEvent>(event: E, payload: EventPayloadMap[E]): void {
         const arr = this._listeners.get(event);
-        if (!arr) return;
-        // Итерируем копию, если подписчик отписывается в обработчике
-        const copy = arr.slice();
-        for (let i = 0; i < copy.length; i++) {
-            copy[i].fn.call(copy[i].ctx, payload);
+        if (!arr || arr.length === 0) return;
+
+        const depth = this._emitDepth;
+        let scratch = this._emitStack[depth];
+        if (!scratch) {
+            scratch = [];
+            this._emitStack[depth] = scratch;
+        }
+
+        const len = arr.length;
+        scratch.length = len;
+        for (let i = 0; i < len; i++) {
+            scratch[i] = arr[i];
+        }
+
+        this._emitDepth = depth + 1;
+        try {
+            for (let i = 0; i < len; i++) {
+                const entry = scratch[i];
+                if (!entry) continue;
+                entry.fn.call(entry.ctx, payload);
+            }
+        } finally {
+            this._emitDepth = depth;
+            // Сбросить ссылки, чтобы GC мог собрать отписанных (длина буфера сохраняется)
+            for (let i = 0; i < len; i++) {
+                scratch[i] = undefined!;
+            }
+            scratch.length = 0;
         }
     }
 }

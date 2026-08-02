@@ -6,6 +6,8 @@
  *   HOLE_SIZE_CHANGED (рост) → showSizeUp
  *   DOOR_OPENED              → showSuccess
  *   GATE_TOUCHED             → showCross
+ *   ITEM_COLLECTED           → при достижении порога: showPerfectMessage + emit PERFECT_MESSAGE
+ *   PERFECT_MESSAGE          → ParticleService / AudioService
  *
  * TutorialState / EndGameState вызывают show/hide напрямую.
  *
@@ -17,6 +19,7 @@
 
 import { Node, Sprite, UIOpacity, Vec3, tween, Tween } from 'cc';
 import { EventBus, GameEvent } from '../core/EventBus';
+import { GameStore } from '../core/GameStore';
 import { CollectableType } from '../gameplay/Collectable';
 import { UIMessagesConfig } from './UIMessagesConfig';
 
@@ -32,6 +35,9 @@ export interface IUIMessagesService {
 
     showSizeUp(): void;
     hideSizeUp(): void;
+
+    showPerfectMessage(): void;
+    hidePerfectMessage(): void;
 
     showTutorial(): void;
     hideTutorial(): void;
@@ -72,10 +78,13 @@ class UIMessagesServiceImpl implements IUIMessagesService {
     private _config: UIMessagesConfig | null = null;
     private _subscribed: boolean = false;
     private _lastHoleScale: number = 1;
+    private _nextPerfectAt: number = 0;
 
     private _cross: FadeSlot | null = null;
     private _success: FadeSlot | null = null;
     private _sizeUp: FadeSlot | null = null;
+    private _perfect: FadeSlot | null = null;
+    private _perfectSprite: Sprite | null = null;
     private _tutorial: FadeSlot | null = null;
     private _tutorialFinger: FadeSlot | null = null;
     private _background: OpacitySlot | null = null;
@@ -94,10 +103,13 @@ class UIMessagesServiceImpl implements IUIMessagesService {
 
         this._config = config;
         this._lastHoleScale = 1;
+        this._rollNextPerfectAt(0);
 
         this._cross = this._bindSprite(config.crossSprite, 'Cross', true);
         this._success = this._bindSprite(config.successSprite, 'Success', true);
         this._sizeUp = this._bindSprite(config.sizeUpSprite, 'SizeUp', true);
+        this._perfectSprite = config.perfectMessageSprite ?? null;
+        this._perfect = this._bindSprite(config.perfectMessageSprite, 'PerfectMessage', true);
         this._tutorial = this._bindSprite(config.tutorialSprite, 'Tutorial', false);
         this._tutorialFinger = this._bindSprite(config.tutorialFingerSprite, 'TutorialFinger', false);
         this._background = this._bindBackground(config.backgroundSprite);
@@ -119,10 +131,16 @@ class UIMessagesServiceImpl implements IUIMessagesService {
             EventBus.on(GameEvent.HOLE_SIZE_CHANGED, this._onHoleSizeChanged, this);
             EventBus.on(GameEvent.DOOR_OPENED, this._onDoorOpened, this);
             EventBus.on(GameEvent.GATE_TOUCHED, this._onGateTouched, this);
+            EventBus.on(GameEvent.ITEM_COLLECTED, this._onItemCollected, this);
             this._subscribed = true;
         }
 
-        console.log('[UIMessagesService] Инициализирован (HOLE_SIZE_CHANGED / DOOR_OPENED / GATE_TOUCHED)');
+        console.log(
+            '[UIMessagesService] Инициализирован' +
+            ` (HOLE_SIZE_CHANGED / DOOR_OPENED / GATE_TOUCHED / ITEM_COLLECTED → PERFECT_MESSAGE)` +
+            ` nextPerfectAt=${this._nextPerfectAt}` +
+            ` perfectSprite=${this._perfect ? this._perfect.node.name : 'NULL'}`,
+        );
     }
 
     destroy(): void {
@@ -130,6 +148,7 @@ class UIMessagesServiceImpl implements IUIMessagesService {
             EventBus.off(GameEvent.HOLE_SIZE_CHANGED, this._onHoleSizeChanged, this);
             EventBus.off(GameEvent.DOOR_OPENED, this._onDoorOpened, this);
             EventBus.off(GameEvent.GATE_TOUCHED, this._onGateTouched, this);
+            EventBus.off(GameEvent.ITEM_COLLECTED, this._onItemCollected, this);
             this._subscribed = false;
         }
 
@@ -139,12 +158,15 @@ class UIMessagesServiceImpl implements IUIMessagesService {
         this._cross = null;
         this._success = null;
         this._sizeUp = null;
+        this._perfect = null;
+        this._perfectSprite = null;
         this._tutorial = null;
         this._tutorialFinger = null;
         this._background = null;
         this._gameEndNode = null;
         this._gameEndTween = null;
         this._lastHoleScale = 1;
+        this._nextPerfectAt = 0;
     }
 
     // ── EventBus ───────────────────────────────────────────────────────
@@ -164,6 +186,19 @@ class UIMessagesServiceImpl implements IUIMessagesService {
         this.showCross();
     };
 
+    private _onItemCollected = (): void => {
+        const count = GameStore.collectedCount;
+        if (this._nextPerfectAt <= 0) {
+            this._rollNextPerfectAt(count);
+        }
+        if (count < this._nextPerfectAt) return;
+
+        this._rollNextPerfectAt(count);
+        // UI сразу; VFX/SFX — через EventBus
+        this.showPerfectMessage();
+        EventBus.emit(GameEvent.PERFECT_MESSAGE, { collectedCount: count });
+    };
+
     // ── Public Show / Hide ─────────────────────────────────────────────
 
     showCross(): void {
@@ -177,6 +212,28 @@ class UIMessagesServiceImpl implements IUIMessagesService {
 
     showSizeUp(): void { this._showFade(this._sizeUp); }
     hideSizeUp(): void { this._hideFade(this._sizeUp); }
+
+    showPerfectMessage(): void {
+        // На случай, если спрайт назначили после init / hot-reload
+        if (!this._perfect && this._config?.perfectMessageSprite) {
+            this._perfectSprite = this._config.perfectMessageSprite;
+            this._perfect = this._bindSprite(this._perfectSprite, 'PerfectMessage', true);
+        }
+        if (!this._perfect) {
+            console.warn('[UIMessagesService] PerfectMessage: спрайт не назначен в UIMessagesConfig');
+            return;
+        }
+
+        this._applyRandomPerfectTexture();
+
+        const node = this._perfect.node;
+        if (node.parent) {
+            node.setSiblingIndex(node.parent.children.length - 1);
+        }
+
+        this._showFade(this._perfect);
+    }
+    hidePerfectMessage(): void { this._hideFade(this._perfect); }
 
     showTutorial(): void { this._showFade(this._tutorial); }
     hideTutorial(): void { this._hideFade(this._tutorial); }
@@ -230,6 +287,7 @@ class UIMessagesServiceImpl implements IUIMessagesService {
         this._hideFadeImmediate(this._cross);
         this._hideFadeImmediate(this._success);
         this._hideFadeImmediate(this._sizeUp);
+        this._hideFadeImmediate(this._perfect);
         this._hideFadeImmediate(this._tutorial);
         this._hideFadeImmediate(this._tutorialFinger);
         this._hideBackgroundImmediate();
@@ -238,6 +296,32 @@ class UIMessagesServiceImpl implements IUIMessagesService {
         if (this._gameEndNode) {
             this._gameEndNode.active = false;
             this._gameEndNode.setPosition(this._gameEndStart);
+        }
+    }
+
+    // ── PerfectMessage helpers ─────────────────────────────────────────
+
+    private _rollNextPerfectAt(fromCount: number): void {
+        const cfg = this._config;
+        let min = Number(cfg?.perfectMessageIntervalMin ?? 20);
+        let max = Number(cfg?.perfectMessageIntervalMax ?? 40);
+        if (!Number.isFinite(min) || min < 1) min = 20;
+        if (!Number.isFinite(max) || max < min) max = Math.max(min, 40);
+        const span = Math.floor(max - min + 1);
+        const interval = min + Math.floor(Math.random() * span);
+        this._nextPerfectAt = fromCount + interval;
+        console.log(`[UIMessagesService] next PerfectMessage at collected=${this._nextPerfectAt}`);
+    }
+
+    private _applyRandomPerfectTexture(): void {
+        const sprite = this._perfectSprite;
+        const frames = this._config?.perfectMessageTextures;
+        if (!sprite || !frames || frames.length === 0) return;
+
+        const idx = Math.floor(Math.random() * frames.length);
+        const frame = frames[idx];
+        if (frame) {
+            sprite.spriteFrame = frame;
         }
     }
 

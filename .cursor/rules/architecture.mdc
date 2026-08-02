@@ -11,7 +11,7 @@ alwaysApply: true
 
 ## Game State Machine (FSM)
 - Game lifecycle is strictly managed by `GameStateMachine`.
-- Allowed transitions: `BootState` → `TutorialState` → `GameplayState` → `EndGameState`.
+- Allowed transitions: `BootState` → `CameraIntroState` → `TutorialState` → `GameplayState` → `EndGameState`.
 - No chaotic global flags (`isStarted`, `isOver`, `isWin`) outside `GameStore`.
 
 ## Bootstrap & Initialization

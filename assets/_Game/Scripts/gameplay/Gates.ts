@@ -1,6 +1,6 @@
 /**
- * Gates — маркер ворот для триггер-коллизии с дырой.
- * При касании HoleController эмитит GameEvent.GATE_TOUCHED.
+ * Gates — маркер ворот для коллизии с дырой.
+ * HoleController при ударе (onCollisionEnter) эмитит GameEvent.GATE_TOUCHED → CrossSprite.
  * Ссылки на View назначаются в Inspector (как Card).
  */
 

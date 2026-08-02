@@ -108,12 +108,6 @@ export class LevelConfig extends Component {
     scorePunchTime: number = 0.1;
 
     @property({ group: { name: 'UI Settings', id: '5' } })
-    tutorialFingerRange: number = 30;
-
-    @property({ group: { name: 'UI Settings', id: '5' } })
-    tutorialAnimTime: number = 0.7;
-
-    @property({ group: { name: 'UI Settings', id: '5' } })
     endCardPopScale: number = 0.7;
 
     // ── Коллекции (физика по цветам) ───────────────────────────────────
@@ -230,8 +224,12 @@ export class LevelConfig extends Component {
     @property({ type: ParticleSystem, group: { name: 'Particles', id: '8' }, tooltip: 'Confetti ParticleSystem (one-shot через ParticleService.playConfetti)' })
     particleConfetti: ParticleSystem = null!;
 
-    @property({ type: ParticleSystem, group: { name: 'Particles', id: '8' }, tooltip: 'Sparkles ParticleSystem (one-shot через ParticleService.playSparkles)' })
-    particleSparkles: ParticleSystem = null!;
+    @property({
+        type: [ParticleSystem],
+        group: { name: 'Particles', id: '8' },
+        tooltip: 'Коллекция ParticleSystem при росте дыры (HOLE_SIZE_CHANGED вверх) — играют все',
+    })
+    particleSparkles: ParticleSystem[] = [];
 }
 
 // Глобальная ссылка для доступа из скриптов без привязки

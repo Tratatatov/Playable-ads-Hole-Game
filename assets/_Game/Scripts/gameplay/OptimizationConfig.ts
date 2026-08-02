@@ -17,10 +17,12 @@ export class OptimizationConfig extends Component {
 
     @property({
         type: CCFloat,
-        tooltip: 'Радиус (XZ) от игрока: ближе — объект включается (node.active = true)',
+        tooltip:
+            'Радиус (XZ) от mainCamera: ближе — soft-uncull MeshRenderer. ' +
+            'На CameraIntro все включены (resetAll), после пролёта — applyNow.',
         min: 0.1,
     })
-    public activationDistance: number = 25;
+    public activationDistance: number = 35;
 
     @property({
         type: CCFloat,
@@ -29,14 +31,23 @@ export class OptimizationConfig extends Component {
             'Убирает мигание на границе.',
         min: 0,
     })
-    public deactivationPadding: number = 5;
+    public deactivationPadding: number = 8;
 
     @property({
         type: CCInteger,
         tooltip: 'Как часто пересчитывать дистанцию (в кадрах). 1 = каждый кадр.',
         min: 1,
     })
-    public updateIntervalFrames: number = 3;
+    public updateIntervalFrames: number = 2;
+
+    @property({
+        type: CCInteger,
+        tooltip:
+            'Макс. soft-cull переключений за один проход (размазывает hitch). ' +
+            'applyNow/init — без лимита.',
+        min: 1,
+    })
+    public maxTogglesPerPass: number = 48;
 
     @property({
         type: [Node],

@@ -34,6 +34,14 @@ class GameStoreImpl implements IGameStore {
         [CollectableType.Teal]: 0,
     };
 
+    /** Переиспользуемые payload'ы — слушатели не должны сохранять ссылку между кадрами */
+    private readonly _remainingPayload: { counts: Record<CollectableType, number> } = {
+        counts: this._remainingCounts,
+    };
+    private readonly _scorePayload: { score: number } = { score: 0 };
+    private readonly _holeScalePayload: { scale: number } = { scale: 1 };
+    private readonly _timerPayload: { timeLeft: number } = { timeLeft: 0 };
+
     get score():     number { return this._score; }
     get holeScale(): number { return this._holeScale; }
     get timeLeft():  number { return this._timeLeft; }
@@ -45,17 +53,20 @@ class GameStoreImpl implements IGameStore {
         this._holeScale = 1;
         this._timeLeft  = LEVEL_CONFIG.totalTime;
         this._collectedCount = 0;
-        this._remainingCounts = {
-            [CollectableType.Blue]: 0,
-            [CollectableType.Red]: 0,
-            [CollectableType.Green]: 0,
-            [CollectableType.Teal]: 0,
-        };
+        this._remainingCounts[CollectableType.Blue] = 0;
+        this._remainingCounts[CollectableType.Red] = 0;
+        this._remainingCounts[CollectableType.Green] = 0;
+        this._remainingCounts[CollectableType.Teal] = 0;
+        this._remainingPayload.counts = this._remainingCounts;
     }
 
     setInitialCollectables(counts: Record<CollectableType, number>): void {
-        this._remainingCounts = { ...counts };
-        EventBus.emit(GameEvent.REMAINING_CHANGED, { counts: this._remainingCounts });
+        this._remainingCounts[CollectableType.Blue] = counts[CollectableType.Blue] ?? 0;
+        this._remainingCounts[CollectableType.Red] = counts[CollectableType.Red] ?? 0;
+        this._remainingCounts[CollectableType.Green] = counts[CollectableType.Green] ?? 0;
+        this._remainingCounts[CollectableType.Teal] = counts[CollectableType.Teal] ?? 0;
+        this._remainingPayload.counts = this._remainingCounts;
+        EventBus.emit(GameEvent.REMAINING_CHANGED, this._remainingPayload);
     }
 
     collectItem(type: CollectableType, scoreValue: number): void {
@@ -65,7 +76,7 @@ class GameStoreImpl implements IGameStore {
         if (prev > 0) {
             this._remainingCounts[type] = prev - 1;
         }
-        EventBus.emit(GameEvent.REMAINING_CHANGED, { counts: this._remainingCounts });
+        EventBus.emit(GameEvent.REMAINING_CHANGED, this._remainingPayload);
 
         if (this._remainingCounts[type] <= 0 && prev > 0) {
             this._emitTypeCleared(type);
@@ -93,19 +104,22 @@ class GameStoreImpl implements IGameStore {
 
     addScore(delta: number): void {
         this._score += delta;
-        EventBus.emit(GameEvent.SCORE_CHANGED, { score: this._score });
+        this._scorePayload.score = this._score;
+        EventBus.emit(GameEvent.SCORE_CHANGED, this._scorePayload);
     }
 
     /** Масштаб дыры. Рост управляется HoleGrowthService → HOLE_SIZE_CHANGED. */
     setHoleScale(scale: number): void {
         if (this._holeScale === scale) return;
         this._holeScale = scale;
-        EventBus.emit(GameEvent.HOLE_SIZE_CHANGED, { scale: this._holeScale });
+        this._holeScalePayload.scale = this._holeScale;
+        EventBus.emit(GameEvent.HOLE_SIZE_CHANGED, this._holeScalePayload);
     }
 
     setTimeLeft(t: number): void {
         this._timeLeft = t;
-        EventBus.emit(GameEvent.TIMER_TICK, { timeLeft: t });
+        this._timerPayload.timeLeft = t;
+        EventBus.emit(GameEvent.TIMER_TICK, this._timerPayload);
     }
 }
 

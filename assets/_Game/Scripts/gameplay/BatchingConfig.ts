@@ -13,14 +13,14 @@ export class BatchingConfig extends Component {
         tooltip: 'Сколько Collectable (RB+Collider) активировать за один батч. Больше = быстрее, но риск просадки FPS.',
         min: 1,
     })
-    public batchSize: number = 10;
+    public batchSize: number = 40;
 
     @property({
         type: CCInteger,
         tooltip: 'Интервал между батчами в кадрах. 1 = каждый кадр, 2 = через кадр, 3 = раз в 3 кадра и т.д.',
         min: 1,
     })
-    public intervalFrames: number = 2;
+    public intervalFrames: number = 1;
 }
 
 export let BATCHING_CONFIG: BatchingConfig = null!;

@@ -3,7 +3,9 @@
  * Follow за дырой (world-space hard-lock / smooth damp) + cinematic через tween.
  * Параметры — из CameraConfig.
  *
- *   DOOR_OPENED → dollyLocalZ (+ опционально orthoHeight / fov), если CameraConfig.dollyOnDoorOpen.
+ *   DOOR_OPENED       → dollyLocalZ (+ опционально) + shake (сильнее).
+ *   HOLE_SIZE_CHANGED → лёгкий shake при росте.
+ *   PERFECT_MESSAGE   → слабый shake.
  *   Dolly твинит offset и не паузит follow — камера продолжает следовать за целью.
  */
 
@@ -37,10 +39,10 @@ export interface ICameraControlService {
      * На время твина follow паузится; после move follow остаётся выключенным
      * (включите снова через setFollowEnabled(true)).
      */
-    moveTo(from: Readonly<Vec3>, to: Readonly<Vec3>, duration?: number): void;
+    moveTo(from: Readonly<Vec3>, to: Readonly<Vec3>, duration?: number, onComplete?: () => void): void;
 
     /** Перемещение из текущей базовой позиции в точку B. */
-    moveToPosition(to: Readonly<Vec3>, duration?: number): void;
+    moveToPosition(to: Readonly<Vec3>, duration?: number, onComplete?: () => void): void;
 
     stopAllTweens(): void;
 }
@@ -54,6 +56,7 @@ class CameraControlServiceImpl implements ICameraControlService {
     private _followEnabled: boolean = true;
     private _cinematicActive: boolean = false;
     private _subscribed: boolean = false;
+    private _lastHoleScale: number = 1;
 
     private readonly _cameraOffset: Vec3 = new Vec3();
     private readonly _basePosition: Vec3 = new Vec3();
@@ -76,6 +79,7 @@ class CameraControlServiceImpl implements ICameraControlService {
     private _orthoTween: Tween<{ height: number }> | null = null;
     private _fovTween: Tween<{ fov: number }> | null = null;
     private _moveTween: Tween<Vec3> | null = null;
+    private _moveOnComplete: (() => void) | null = null;
 
     init(camera: Node, target: Node, config: CameraConfig | null): void {
         this._camera = camera;
@@ -94,6 +98,7 @@ class CameraControlServiceImpl implements ICameraControlService {
 
         this._followEnabled = config ? config.followEnabledOnStart : true;
         this._cinematicActive = false;
+        this._lastHoleScale = 1;
 
         this._camera.getWorldPosition(this._basePosition);
         this._target.getWorldPosition(this._targetWorld);
@@ -106,6 +111,8 @@ class CameraControlServiceImpl implements ICameraControlService {
 
         if (!this._subscribed) {
             EventBus.on(GameEvent.DOOR_OPENED, this._onDoorOpened, this);
+            EventBus.on(GameEvent.HOLE_SIZE_CHANGED, this._onHoleSizeChanged, this);
+            EventBus.on(GameEvent.PERFECT_MESSAGE, this._onPerfectMessage, this);
             this._subscribed = true;
         }
     }
@@ -113,6 +120,8 @@ class CameraControlServiceImpl implements ICameraControlService {
     destroy(): void {
         if (this._subscribed) {
             EventBus.off(GameEvent.DOOR_OPENED, this._onDoorOpened, this);
+            EventBus.off(GameEvent.HOLE_SIZE_CHANGED, this._onHoleSizeChanged, this);
+            EventBus.off(GameEvent.PERFECT_MESSAGE, this._onPerfectMessage, this);
             this._subscribed = false;
         }
         this.stopAllTweens();
@@ -120,11 +129,43 @@ class CameraControlServiceImpl implements ICameraControlService {
         this._cameraComp = null;
         this._target = null;
         this._config = null;
+        this._lastHoleScale = 1;
     }
 
     private _onDoorOpened = (_payload: { type: CollectableType }): void => {
-        if (this._config && !this._config.dollyOnDoorOpen) return;
-        this.dollyLocalZ();
+        const cfg = this._config;
+        if (!cfg || cfg.dollyOnDoorOpen) {
+            this.dollyLocalZ();
+        }
+        if (!cfg || cfg.shakeOnDoorOpen) {
+            this.shake(
+                cfg?.doorOpenShakeIntensity ?? 0.18,
+                cfg?.doorOpenShakeDuration ?? 0.35
+            );
+        }
+    };
+
+    private _onHoleSizeChanged = (payload: { scale: number }): void => {
+        if (payload.scale > this._lastHoleScale) {
+            const cfg = this._config;
+            if (!cfg || cfg.shakeOnHoleGrow) {
+                this.shake(
+                    cfg?.holeGrowShakeIntensity ?? 0.1,
+                    cfg?.holeGrowShakeDuration ?? 0.28
+                );
+            }
+        }
+        this._lastHoleScale = payload.scale;
+    };
+
+    private _onPerfectMessage = (): void => {
+        const cfg = this._config;
+        if (!cfg || cfg.shakeOnPerfectMessage) {
+            this.shake(
+                cfg?.perfectShakeIntensity ?? 0.05,
+                cfg?.perfectShakeDuration ?? 0.2
+            );
+        }
     };
 
     setFollowEnabled(enabled: boolean): void {
@@ -272,8 +313,11 @@ class CameraControlServiceImpl implements ICameraControlService {
         }
     }
 
-    moveTo(from: Readonly<Vec3>, to: Readonly<Vec3>, duration?: number): void {
-        if (!this._camera) return;
+    moveTo(from: Readonly<Vec3>, to: Readonly<Vec3>, duration?: number, onComplete?: () => void): void {
+        if (!this._camera) {
+            onComplete?.();
+            return;
+        }
 
         const dur = Math.max(0.01, duration ?? this._config?.moveDuration ?? 1);
         const easing = (this._config?.moveEasing ?? 'quadIn') as any;
@@ -287,6 +331,7 @@ class CameraControlServiceImpl implements ICameraControlService {
         this._stopMoveTween();
         this._cinematicActive = true;
         this._followEnabled = false;
+        this._moveOnComplete = onComplete ?? null;
 
         this._basePosition.set(this._moveFrom);
 
@@ -295,13 +340,16 @@ class CameraControlServiceImpl implements ICameraControlService {
             .call(() => {
                 this._moveTween = null;
                 this._cinematicActive = false;
+                const cb = this._moveOnComplete;
+                this._moveOnComplete = null;
+                cb?.();
             })
             .start();
     }
 
-    moveToPosition(to: Readonly<Vec3>, duration?: number): void {
+    moveToPosition(to: Readonly<Vec3>, duration?: number, onComplete?: () => void): void {
         this._moveFrom.set(this._basePosition);
-        this.moveTo(this._moveFrom, to, duration);
+        this.moveTo(this._moveFrom, to, duration, onComplete);
     }
 
     stopAllTweens(): void {
@@ -349,6 +397,7 @@ class CameraControlServiceImpl implements ICameraControlService {
             this._moveTween.stop();
             this._moveTween = null;
         }
+        this._moveOnComplete = null;
     }
 }
 

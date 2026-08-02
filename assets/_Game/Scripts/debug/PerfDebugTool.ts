@@ -101,7 +101,7 @@ export class PerfDebugTool extends Component {
 
     @property({
         group: { name: 'Optimization', id: 'opt' },
-        tooltip: 'Применить OptimizationConfig (Edit Mode + Play). Distance culling от дыры.',
+        tooltip: 'Применить OptimizationConfig (Edit Mode + Play). Soft distance culling (MR/RB/Col).',
     })
     public get applyOptimization(): boolean { return false; }
     public set applyOptimization(v: boolean) {
@@ -202,19 +202,19 @@ export class PerfDebugTool extends Component {
         }
 
         const cfg = boot.optimizationConfig;
-        const player = boot.holeController ? boot.holeController.node : null;
+        const origin = boot.mainCamera ? boot.mainCamera : null;
 
         if (!cfg || !cfg.isValid) {
             console.warn('[PerfDebugTool] Optimization: OptimizationConfig не назначен на GameBootstrap');
             return false;
         }
-        if (!player || !player.isValid) {
-            console.warn('[PerfDebugTool] Optimization: HoleController не назначен на GameBootstrap');
+        if (!origin || !origin.isValid) {
+            console.warn('[PerfDebugTool] Optimization: mainCamera не назначен на GameBootstrap');
             return false;
         }
 
         // Актуальные ссылки из Inspector (без reset suspend / без auto-evaluate)
-        if (!OptimizationService.bind(cfg, player)) {
+        if (!OptimizationService.bind(cfg, origin)) {
             console.warn('[PerfDebugTool] Optimization: bind не удался');
             return false;
         }
@@ -658,7 +658,7 @@ export class PerfDebugTool extends Component {
             case 'Materials (batch breaks)':
                 return '  Hint: один shared material на цвет + USE_INSTANCING';
             case 'Active Collectables':
-                return '  Hint: пул + active=false для далёких / уже собранных';
+                return '  Hint: OptimizationService soft-cull (MR/RB/Col) + собранные node.active=false';
             case 'Stencil Hole':
                 return '  Hint: A/B bench для точного %; большой floorPunch-меш = stencil test на каждый пиксель';
             default:

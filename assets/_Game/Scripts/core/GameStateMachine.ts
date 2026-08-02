@@ -1,6 +1,6 @@
 /**
  * GameStateMachine — конечный автомат состояний игры.
- * Допустимые переходы: Boot → Tutorial → Gameplay → EndGame.
+ * Допустимые переходы: Boot → CameraIntro → Tutorial → Gameplay → EndGame.
  * При переходе вызывает exit() текущей фазы и enter() следующей.
  */
 import { EventBus, GameEvent } from './EventBus';
@@ -11,10 +11,11 @@ export { GameState };
 
 /** Допустимые переходы состояний */
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-    [GameState.Boot]:     [GameState.Tutorial],
-    [GameState.Tutorial]: [GameState.Gameplay],
-    [GameState.Gameplay]: [GameState.EndGame],
-    [GameState.EndGame]:  [],
+    [GameState.Boot]:        [GameState.CameraIntro],
+    [GameState.CameraIntro]: [GameState.Tutorial],
+    [GameState.Tutorial]:    [GameState.Gameplay],
+    [GameState.Gameplay]:    [GameState.EndGame],
+    [GameState.EndGame]:      [],
 };
 
 export interface IGameStateMachine {

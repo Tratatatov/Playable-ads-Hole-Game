@@ -1,5 +1,6 @@
 import { _decorator, Component, Label, Node, Button, UIOpacity, CCFloat } from 'cc';
 import { Card } from './Card';
+import { TutorialFinger } from './TutorialFinger';
 const { ccclass, property } = _decorator;
 
 /**
@@ -10,13 +11,16 @@ const { ccclass, property } = _decorator;
 export class UIConfig extends Component {
 
     // ── TutorialState ──────────────────────────────────────────────────
-    @property({ type: Node, group: { name: 'TutorialState', id: '1' }, tooltip: 'Анимированный палец туториала' })
+    @property({ type: TutorialFinger, group: { name: 'TutorialState', id: '1' }, tooltip: 'Компонент TutorialFinger на ноде пальца' })
+    tutorialFinger: TutorialFinger = null!;
+
+    @property({ type: Node, group: { name: 'TutorialState', id: '1' }, tooltip: 'Нода пальца (если TutorialFinger не назначен — возьмём/добавим компонент с неё)' })
     tutorialFingerNode: Node = null!;
 
-    @property({ type: Node, group: { name: 'TutorialState', id: '1' }, tooltip: 'Корневая панель туториала' })
+    @property({ type: Node, group: { name: 'TutorialState', id: '1' }, tooltip: 'Нода TutorialSprite (∞). Fade через UIOpacity' })
     tutorialPanel: Node = null!;
 
-    @property({ type: UIOpacity, group: { name: 'TutorialState', id: '1' }, tooltip: 'UIOpacity панели туториала (fade-out)' })
+    @property({ type: UIOpacity, group: { name: 'TutorialState', id: '1' }, tooltip: '(Устарело) UIOpacity панели — View сам берёт/создаёт UIOpacity' })
     tutorialPanelOpacity: UIOpacity = null!;
 
     // ── GameplayState ──────────────────────────────────────────────────

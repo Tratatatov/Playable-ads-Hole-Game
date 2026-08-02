@@ -10,8 +10,8 @@ import { BATCHING_CONFIG } from './BatchingConfig';
 
 const { ccclass, property } = _decorator;
 
-const DEFAULT_BATCH_SIZE = 10;
-const DEFAULT_INTERVAL_FRAMES = 2;
+const DEFAULT_BATCH_SIZE = 40;
+const DEFAULT_INTERVAL_FRAMES = 1;
 
 @ccclass('CollectableContainer')
 export class CollectableContainer extends Component {
@@ -50,6 +50,9 @@ export class CollectableContainer extends Component {
     private _wakeBudget: number = 0;
     private _woken: number = 0;
     private _framesUntilBatch: number = 0;
+    /** Фокус для nearest-first (камера / дыра). NaN = fallback Z ↓ */
+    private static _sortFocusX: number = NaN;
+    private static _sortFocusZ: number = NaN;
 
     /** Счётчики по типам */
     public getCounts(): Record<CollectableType, number> {
@@ -70,15 +73,27 @@ export class CollectableContainer extends Component {
     }
 
     /**
-     * Асинхронная активация: Z ↓, батчами по BatchingConfig.
+     * Асинхронная активация батчами по BatchingConfig.
      * @param wakeUpPercent доля RB (0..100), у которых вызвать wakeUp
+     * @param focusX/focusZ — nearest-first от этой точки (обычно камера); иначе Z ↓
      */
-    public activate(wakeUpPercent: number = 33): void {
+    public activate(
+        wakeUpPercent: number = 33,
+        focusX: number = Number.NaN,
+        focusZ: number = Number.NaN
+    ): void {
         this._cancelActivation();
         this.ensurePhysicsCache();
 
         this._bodyQueue.length = 0;
         this._colQueue.length = 0;
+
+        CollectableContainer._sortFocusX = focusX;
+        CollectableContainer._sortFocusZ = focusZ;
+        const useFocus = Number.isFinite(focusX) && Number.isFinite(focusZ);
+        const cmp = useFocus
+            ? CollectableContainer._compareByDistAsc
+            : CollectableContainer._compareByZDesc;
 
         const bodies = this.rigidBodies;
         for (let i = 0; i < bodies.length; i++) {
@@ -87,7 +102,7 @@ export class CollectableContainer extends Component {
                 this._bodyQueue.push(body);
             }
         }
-        this._bodyQueue.sort(CollectableContainer._compareByZDesc);
+        this._bodyQueue.sort(cmp);
 
         const cols = this.colliders;
         for (let i = 0; i < cols.length; i++) {
@@ -96,14 +111,13 @@ export class CollectableContainer extends Component {
                 this._colQueue.push(col);
             }
         }
-        this._colQueue.sort(CollectableContainer._compareByZDesc);
+        this._colQueue.sort(cmp);
 
         const pct = Math.max(0, Math.min(100, wakeUpPercent));
         this._wakeBudget = Math.ceil(this._bodyQueue.length * (pct / 100));
         this._woken = 0;
         this._bodyIndex = 0;
         this._colIndex = 0;
-        // 0 → первый батч на ближайшем update, дальше — каждые intervalFrames
         this._framesUntilBatch = 0;
         this._activating = this._bodyQueue.length > 0 || this._colQueue.length > 0;
 
@@ -111,7 +125,7 @@ export class CollectableContainer extends Component {
             `[CollectableContainer] ACTIVATE "${this.node.name}": ` +
             `RB=${this._bodyQueue.length}, Col=${this._colQueue.length}, ` +
             `batch=${this._getBatchSize()} every ${this._getIntervalFrames()}f, ` +
-            `wakeUp=${this._wakeBudget}`
+            `wakeUp=${this._wakeBudget}, sort=${useFocus ? 'nearest' : 'Z↓'}`
         );
 
         if (!this._activating) {
@@ -258,5 +272,17 @@ export class CollectableContainer extends Component {
 
     private static _compareByZDesc(a: { node: Node }, b: { node: Node }): number {
         return b.node.worldPosition.z - a.node.worldPosition.z;
+    }
+
+    private static _compareByDistAsc(a: { node: Node }, b: { node: Node }): number {
+        const fx = CollectableContainer._sortFocusX;
+        const fz = CollectableContainer._sortFocusZ;
+        const ap = a.node.worldPosition;
+        const bp = b.node.worldPosition;
+        const adx = ap.x - fx;
+        const adz = ap.z - fz;
+        const bdx = bp.x - fx;
+        const bdz = bp.z - fz;
+        return (adx * adx + adz * adz) - (bdx * bdx + bdz * bdz);
     }
 }

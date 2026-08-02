@@ -70,6 +70,8 @@ class InputServiceImpl implements IInputService {
         this._touchOffset.set(0, 0);
         this._touchStart.set(e.getLocation());
 
+        EventBus.emit(GameEvent.TOUCH_START, null);
+
         if (GameStateMachine.is(GameState.Tutorial)) {
             EventBus.emit(GameEvent.FIRST_TOUCH, null);
         }
@@ -83,9 +85,11 @@ class InputServiceImpl implements IInputService {
     }
 
     private _end(): void {
+        if (!this._isTouching) return;
         this._isTouching = false;
         this._isMouseInput = false;
         this._touchOffset.set(0, 0);
+        EventBus.emit(GameEvent.TOUCH_END, null);
     }
 
     private _onTouchStart = (e: EventTouch): void => { this._begin(e, false); };

@@ -10,6 +10,7 @@ import { CollectableType } from '../gameplay/Collectable';
 import { CollectableContainer } from '../gameplay/CollectableContainer';
 import { LEVEL_CONFIG } from '../gameplay/LevelConfig';
 import { BATCHING_CONFIG } from '../gameplay/BatchingConfig';
+import { OptimizationService } from './OptimizationService';
 
 export interface ICollectableCollectionService {
     init(): void;
@@ -26,6 +27,7 @@ class CollectableCollectionServiceImpl implements ICollectableCollectionService 
     private _byType: Partial<Record<CollectableType, CollectableContainer | null>> = {};
     private _allContainers: CollectableContainer[] = [];
     private _subscribed: boolean = false;
+    private readonly _focusXZ: { x: number; z: number } = { x: 0, z: 0 };
 
     init(): void {
         console.log('[CollectableCollectionService] === INIT START ===');
@@ -121,8 +123,16 @@ class CollectableCollectionServiceImpl implements ICollectableCollectionService 
             console.warn('[CollectableCollectionService] ACTIVATE: container invalid — skip');
             return;
         }
+
+        // Сразу показать меши зоны (Teal и др.), физика догонит батчем nearest-first
+        OptimizationService.uncullUnder(container.parentNode);
+
         const wakePct = LEVEL_CONFIG ? LEVEL_CONFIG.wakeUpPercent : 33;
-        container.activate(wakePct);
+        if (OptimizationService.copyOriginXZ(this._focusXZ)) {
+            container.activate(wakePct, this._focusXZ.x, this._focusXZ.z);
+        } else {
+            container.activate(wakePct);
+        }
     }
 
     deactivate(container: CollectableContainer | null): void {

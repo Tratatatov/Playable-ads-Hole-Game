@@ -2,9 +2,10 @@
  * GameBootstrap — точка входа игры.
  * Последовательность:
  *   1. Boot: инициализация сервисов, UI, AdNetworkManager.gameReady()
- *   2. TutorialState: ждём первый тач, показываем tutorial UI
- *   3. GameplayState: таймер тикает, игрок двигается
- *   4. EndGameState: отключаем ввод, показываем EndGame UI
+ *   2. CameraIntroState: пролёт камеры A→B, без управления
+ *   3. TutorialState: ждём первый тач, показываем tutorial UI
+ *   4. GameplayState: таймер тикает, игрок двигается
+ *   5. EndGameState: отключаем ввод, показываем EndGame UI
  *
  * RULES §1.2: Жизненный цикл строго инкапсулирован в FSM.
  */
@@ -14,7 +15,6 @@ import { EventBus, GameEvent } from './core/EventBus';
 import { GameStateMachine, GameState } from './core/GameStateMachine';
 import { GameStore } from './core/GameStore';
 import { AdNetworkManager } from './core/AdNetworkManager';
-import { InputService } from './core/InputService';
 import { CameraControlService } from './core/CameraControlService';
 import { CameraConfig } from './core/CameraConfig';
 import { TimerService } from './core/TimerService';
@@ -26,6 +26,7 @@ import { AudioService } from './core/AudioService';
 import { AudioConfig } from './core/AudioConfig';
 import { ParticleService } from './core/ParticleService';
 import { TweenService } from './core/TweenService';
+import { CameraIntroState } from './core/states/CameraIntroState';
 import { TutorialState } from './core/states/TutorialState';
 import { GameplayState } from './core/states/GameplayState';
 import { EndGameState } from './core/states/EndGameState';
@@ -42,6 +43,7 @@ import { TimerView } from './ui/TimerView';
 import { TimerPresenter } from './ui/TimerPresenter';
 import { TutorialView } from './ui/TutorialView';
 import { TutorialPresenter } from './ui/TutorialPresenter';
+import { TutorialFinger } from './ui/TutorialFinger';
 import { EndCardView } from './ui/EndCardView';
 import { EndCardPresenter } from './ui/EndCardPresenter';
 import { RemainingCollectablesView } from './ui/RemainingCollectablesView';
@@ -138,14 +140,11 @@ export class GameBootstrap extends Component {
         DoorService.init();
         // После DoorService: коллекции слушают DOOR_OPENED и включают следующий цвет
         CollectableCollectionService.init();
-        ParticleService.init();
-        // #region agent log
-        fetch('http://127.0.0.1:7681/ingest/62937d31-24ee-45cd-bae7-0a88a5b27d0d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'904b78'},body:JSON.stringify({sessionId:'904b78',runId:'pre-fix',hypothesisId:'A,D',location:'GameBootstrap.ts:_boot',message:'before OptimizationService.init',data:{hasOptConfig:!!this.optimizationConfig,optConfigValid:!!(this.optimizationConfig&&this.optimizationConfig.isValid),optNodeActive:this.optimizationConfig?this.optimizationConfig.node?.active:null,hasHole:!!this.holeController},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
+        ParticleService.init(this.uiMessagesConfig?.perfectMessageParticles ?? null);
 
         OptimizationService.init(
             this.optimizationConfig,
-            this.holeController ? this.holeController.node : null
+            this.mainCamera ? this.mainCamera : null
         );
 
         if (this.audioConfig) {
@@ -165,21 +164,22 @@ export class GameBootstrap extends Component {
         // 3. Рекламная сеть
         AdNetworkManager.gameReady();
 
-        // 4. Ввод (FIRST_TOUCH в Tutorial)
-        InputService.enable();
+        // 4. Ввод включается в TutorialState (после пролёта камеры)
 
         // 5. Зарегистрировать фазы игрового цикла
+        GameStateMachine.register(GameState.CameraIntro, new CameraIntroState(this.cameraConfig));
         GameStateMachine.register(GameState.Tutorial, new TutorialState(this._tutorialPresenter));
         GameStateMachine.register(GameState.Gameplay, new GameplayState());
         GameStateMachine.register(GameState.EndGame, new EndGameState(this._endCardPresenter));
 
-        // 6. Переходы: первый тач → Gameplay; таймер истёк → EndGame
+        // 6. Переходы: intro done → Tutorial; первый тач → Gameplay; таймер истёк → EndGame
+        EventBus.on(GameEvent.CAMERA_INTRO_COMPLETE, this._onCameraIntroComplete, this);
         EventBus.on(GameEvent.FIRST_TOUCH, this._onFirstTouch, this);
         EventBus.on(GameEvent.TIMER_EXPIRED, this._onTimerExpired, this);
 
-        // 7. Boot → Tutorial
-        console.log('[GameBootstrap] Переход в TutorialState');
-        GameStateMachine.transition(GameState.Tutorial);
+        // 7. Boot → CameraIntro
+        console.log('[GameBootstrap] Переход в CameraIntroState');
+        GameStateMachine.transition(GameState.CameraIntro);
 
         console.log('[GameBootstrap] Инициализация завершена!');
     }
@@ -213,17 +213,21 @@ export class GameBootstrap extends Component {
             this._timerPresenter.init();
         }
 
-        // TutorialState UI
-        if (ui.tutorialFingerNode && ui.tutorialPanel && ui.tutorialPanelOpacity) {
+        // TutorialState UI — достаточно пальца; panel/opacity опциональны
+        const finger =
+            ui.tutorialFinger
+            ?? ui.tutorialFingerNode?.getComponent(TutorialFinger)
+            ?? (ui.tutorialFingerNode ? ui.tutorialFingerNode.addComponent(TutorialFinger) : null);
+
+        if (finger) {
             const tutorialView = new TutorialView(
-                ui.tutorialFingerNode,
-                ui.tutorialPanel,
-                ui.tutorialPanelOpacity
+                finger,
+                ui.tutorialPanel
             );
             this._tutorialPresenter = new TutorialPresenter(tutorialView);
             this._tutorialPresenter.init();
         } else {
-            console.warn('[GameBootstrap] TutorialState UI не полностью назначен в UIConfig');
+            console.warn('[GameBootstrap] TutorialFinger / tutorialFingerNode не назначен в UIConfig');
         }
 
         // EndGameState UI
@@ -241,6 +245,13 @@ export class GameBootstrap extends Component {
         }
     }
 
+    private _onCameraIntroComplete = (): void => {
+        // После пролёта — distance soft-cull (всё было видно на intro через resetAll)
+        OptimizationService.applyNow();
+        console.log('[GameBootstrap] Пролёт камеры завершён → TutorialState');
+        GameStateMachine.transition(GameState.Tutorial);
+    };
+
     private _onFirstTouch = (): void => {
         console.log('[GameBootstrap] Первый тач → GameplayState');
         GameStateMachine.transition(GameState.Gameplay);
@@ -252,6 +263,7 @@ export class GameBootstrap extends Component {
     };
 
     onDestroy(): void {
+        EventBus.off(GameEvent.CAMERA_INTRO_COMPLETE, this._onCameraIntroComplete, this);
         EventBus.off(GameEvent.FIRST_TOUCH, this._onFirstTouch, this);
         EventBus.off(GameEvent.TIMER_EXPIRED, this._onTimerExpired, this);
         CollectableCollectionService.destroy();

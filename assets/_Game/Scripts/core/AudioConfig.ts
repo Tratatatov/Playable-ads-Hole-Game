@@ -2,7 +2,7 @@
  * AudioConfig — клипы и громкости SFX (назначаются в Inspector).
  */
 
-import { _decorator, Component, AudioClip, CCFloat } from 'cc';
+import { _decorator, Component, AudioClip, CCFloat, CCInteger } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('AudioConfig')
@@ -17,9 +17,12 @@ export class AudioConfig extends Component {
     @property({ type: AudioClip, group: { name: 'SFX Clips', id: '1' }, tooltip: 'Звук открытия ворот (DOOR_OPENED)' })
     doorOpenClip: AudioClip = null!;
 
+    @property({ type: AudioClip, group: { name: 'SFX Clips', id: '1' }, tooltip: 'Звук Perfect / Nice / Great (PERFECT_MESSAGE)' })
+    perfectMessageClip: AudioClip = null!;
+
     // ── Громкости ──────────────────────────────────────────────────────
     @property({ type: CCFloat, group: { name: 'Volumes', id: '2' }, range: [0, 1, 0.05], slide: true })
-    collectVolume: number = 1;
+    collectVolume: number = 0.55;
 
     @property({ type: CCFloat, group: { name: 'Volumes', id: '2' }, range: [0, 1, 0.05], slide: true })
     holeGrowVolume: number = 1;
@@ -27,10 +30,43 @@ export class AudioConfig extends Component {
     @property({ type: CCFloat, group: { name: 'Volumes', id: '2' }, range: [0, 1, 0.05], slide: true })
     doorOpenVolume: number = 1;
 
+    @property({ type: CCFloat, group: { name: 'Volumes', id: '2' }, range: [0, 1, 0.05], slide: true })
+    perfectMessageVolume: number = 1;
+
     // ── Pitch (сбор) ───────────────────────────────────────────────────
     @property({ type: CCFloat, group: { name: 'Collect Pitch', id: '3' }, tooltip: 'Мин. pitch при сборе', range: [0.1, 3, 0.05], slide: true })
-    collectPitchMin: number = 0.9;
+    collectPitchMin: number = 0.95;
 
     @property({ type: CCFloat, group: { name: 'Collect Pitch', id: '3' }, tooltip: 'Макс. pitch при сборе', range: [0.1, 3, 0.05], slide: true })
-    collectPitchMax: number = 1.1;
+    collectPitchMax: number = 1.08;
+
+    // ── Collect pool / anti-mud ─────────────────────────────────────────
+    @property({
+        type: CCInteger,
+        group: { name: 'Collect Pool', id: '4' },
+        tooltip: 'Сколько параллельных collect-голосов. Больше = меньше обрывов, но тяжелее.',
+        min: 2,
+        max: 16,
+    })
+    collectPoolSize: number = 8;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Collect Pool', id: '4' },
+        tooltip: 'Мин. интервал между collect SFX (сек). Режет «кашу» при вакууме.',
+        range: [0, 0.2, 0.005],
+        slide: true,
+    })
+    collectMinInterval: number = 0.04;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Collect Pool', id: '4' },
+        tooltip:
+            'Ослабление громкости при нескольких активных голосах: ' +
+            'vol /= 1 + k*(active-1). 0 = без attenuation.',
+        range: [0, 1, 0.05],
+        slide: true,
+    })
+    collectStackAttenuation: number = 0.35;
 }

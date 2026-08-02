@@ -20,14 +20,13 @@ import { LevelConfig } from '../gameplay/LevelConfig';
 
 const { ccclass, property, executeInEditMode, menu, disallowMultiple } = _decorator;
 
-/** Палитра Unity confetti_small (RandomColor gradient, 6 ключей). */
+/** Яркая «кондитерская» палитра под сцену с макарунами (без кислотного неона). */
 const UNITY_CONFETTI_COLORS: ReadonlyArray<Readonly<[number, number, number]>> = [
-    [231, 64, 47],   // red
-    [255, 149, 0],   // orange
-    [255, 244, 0],   // yellow
-    [69, 233, 149],  // green
-    [0, 210, 214],   // cyan
-    [38, 98, 245],   // blue
+    [244, 86, 92],   // candy coral
+    [255, 204, 72],  // sunny honey
+    [92, 168, 255],  // sky blue
+    [255, 110, 168], // candy pink
+    [186, 128, 255], // soft lavender (под фиолетовые макаруны)
 ];
 
 /** ShapeType.Sphere в Cocos Creator 3.x */

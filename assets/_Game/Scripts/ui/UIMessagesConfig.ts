@@ -3,7 +3,7 @@
  * Назначается в Inspector на GameBootstrap.
  */
 
-import { _decorator, Component, Node, Sprite, CCFloat, CCInteger } from 'cc';
+import { _decorator, Component, Node, Sprite, SpriteFrame, ParticleSystem, CCFloat, CCInteger } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('UIMessagesConfig')
@@ -27,6 +27,44 @@ export class UIMessagesConfig extends Component {
 
     @property({ type: Sprite, group: { name: 'Sprites', id: '1' }, tooltip: 'Фон (FadeIn при конце игры)' })
     backgroundSprite: Sprite = null!;
+
+    // ── Perfect Message ────────────────────────────────────────────────
+    @property({
+        type: Sprite,
+        group: { name: 'Perfect Message', id: '1b' },
+        tooltip: 'Спрайт Perfect / Nice / Great (случайная текстура)',
+    })
+    perfectMessageSprite: Sprite = null!;
+
+    @property({
+        type: [SpriteFrame],
+        group: { name: 'Perfect Message', id: '1b' },
+        tooltip: 'Пул текстур для PerfectMessage (случайный выбор при показе)',
+    })
+    perfectMessageTextures: SpriteFrame[] = [];
+
+    @property({
+        type: ParticleSystem,
+        group: { name: 'Perfect Message', id: '1b' },
+        tooltip: 'Партиклы при PerfectMessage (EventBus → ParticleService)',
+    })
+    perfectMessageParticles: ParticleSystem = null!;
+
+    @property({
+        type: CCInteger,
+        group: { name: 'Perfect Message', id: '1b' },
+        tooltip: 'Мин. число собранных до следующего PerfectMessage',
+        min: 1,
+    })
+    perfectMessageIntervalMin: number = 20;
+
+    @property({
+        type: CCInteger,
+        group: { name: 'Perfect Message', id: '1b' },
+        tooltip: 'Макс. число собранных до следующего PerfectMessage',
+        min: 1,
+    })
+    perfectMessageIntervalMax: number = 40;
 
     // ── Game End Sprite ────────────────────────────────────────────────
     @property({ type: Sprite, group: { name: 'Game End Sprite', id: '2' }, tooltip: 'Спрайт конца игры (выезжает снизу)' })
@@ -154,11 +192,17 @@ export class UIMessagesConfig extends Component {
         this._deactivateSprite(this.crossSprite);
         this._deactivateSprite(this.successSprite);
         this._deactivateSprite(this.sizeUpSprite);
+        this._deactivateSprite(this.perfectMessageSprite);
         this._deactivateSprite(this.tutorialSprite);
         this._deactivateSprite(this.tutorialFingerSprite);
         this._deactivateSprite(this.gameEndSprite);
         if (this.gameEndPanelEndPoint) {
             this.gameEndPanelEndPoint.active = false;
+        }
+        if (this.perfectMessageParticles?.isValid) {
+            this.perfectMessageParticles.playOnAwake = false;
+            this.perfectMessageParticles.stop();
+            this.perfectMessageParticles.clear();
         }
     }
 
