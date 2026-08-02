@@ -23,8 +23,9 @@ export const enum GameEvent {
     TYPE_RED_CLEARED       = 'type_red_cleared',
     TYPE_GREEN_CLEARED     = 'type_green_cleared',
     TYPE_TEAL_CLEARED = 'type_teal_cleared',
-    // Doors
+    // Doors / Gates
     DOOR_OPENED         = 'door_opened',
+    GATE_TOUCHED        = 'gate_touched',
     // Timer
     TIMER_TICK          = 'timer_tick',
     TIMER_EXPIRED       = 'timer_expired',
@@ -37,7 +38,7 @@ export interface EventPayloadMap {
     [GameEvent.STATE_CHANGED]:     { state: GameState };
     [GameEvent.GAME_START]:        null;
     [GameEvent.GAME_END]:          { score: number };
-    [GameEvent.ITEM_COLLECTED]:    { score: number; totalScore: number };
+    [GameEvent.ITEM_COLLECTED]:    { score: number; totalScore: number; type: CollectableType };
     [GameEvent.SCORE_CHANGED]:     { score: number };
     [GameEvent.HOLE_SIZE_CHANGED]: { scale: number };
     [GameEvent.REMAINING_CHANGED]: { counts: Record<CollectableType, number> };
@@ -46,6 +47,7 @@ export interface EventPayloadMap {
     [GameEvent.TYPE_GREEN_CLEARED]:     null;
     [GameEvent.TYPE_TEAL_CLEARED]: null;
     [GameEvent.DOOR_OPENED]:       { type: CollectableType };
+    [GameEvent.GATE_TOUCHED]:      null;
     [GameEvent.TIMER_TICK]:        { timeLeft: number };
     [GameEvent.TIMER_EXPIRED]:     null;
     [GameEvent.FIRST_TOUCH]:       null;

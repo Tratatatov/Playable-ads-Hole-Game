@@ -16,6 +16,7 @@ import { GameStore } from './core/GameStore';
 import { AdNetworkManager } from './core/AdNetworkManager';
 import { InputService } from './core/InputService';
 import { CameraControlService } from './core/CameraControlService';
+import { CameraConfig } from './core/CameraConfig';
 import { TimerService } from './core/TimerService';
 import { CollectableCounterService } from './core/CollectableCounterService';
 import { HoleGrowthService } from './core/HoleGrowthService';
@@ -24,6 +25,7 @@ import { CollectableCollectionService } from './core/CollectableCollectionServic
 import { AudioService } from './core/AudioService';
 import { AudioConfig } from './core/AudioConfig';
 import { ParticleService } from './core/ParticleService';
+import { TweenService } from './core/TweenService';
 import { TutorialState } from './core/states/TutorialState';
 import { GameplayState } from './core/states/GameplayState';
 import { EndGameState } from './core/states/EndGameState';
@@ -33,6 +35,9 @@ import { BatchingConfig, setBatchingConfig } from './gameplay/BatchingConfig';
 import { OptimizationConfig } from './gameplay/OptimizationConfig';
 import { OptimizationService } from './core/OptimizationService';
 import { UIConfig } from './ui/UIConfig';
+import { UIMessagesConfig } from './ui/UIMessagesConfig';
+import { UIMessagesService } from './ui/UIMessagesService';
+import { UIAnimationService } from './ui/UIAnimationService';
 import { TimerView } from './ui/TimerView';
 import { TimerPresenter } from './ui/TimerPresenter';
 import { TutorialView } from './ui/TutorialView';
@@ -58,8 +63,14 @@ export class GameBootstrap extends Component {
     @property(UIConfig)
     uiConfig: UIConfig = null!;
 
+    @property(UIMessagesConfig)
+    uiMessagesConfig: UIMessagesConfig = null!;
+
     @property(AudioConfig)
     audioConfig: AudioConfig = null!;
+
+    @property(CameraConfig)
+    cameraConfig: CameraConfig = null!;
 
     @property(BatchingConfig)
     batchingConfig: BatchingConfig = null!;
@@ -98,7 +109,10 @@ export class GameBootstrap extends Component {
         // 0. Initialize scene controllers
         this.holeController?.init();
         if (this.mainCamera && this.holeController) {
-            CameraControlService.init(this.mainCamera, this.holeController.node);
+            if (!this.cameraConfig) {
+                console.warn('[GameBootstrap] CameraConfig не назначен — камера с дефолтными параметрами');
+            }
+            CameraControlService.init(this.mainCamera, this.holeController.node, this.cameraConfig);
         }
 
         this._initUI();
@@ -109,11 +123,26 @@ export class GameBootstrap extends Component {
         // 2. Сервисы
         CollectableCounterService.init();
         TimerService.init(this.levelConfig.totalTime);
-        HoleGrowthService.init();
+        TweenService.init();
+        if (this.uiMessagesConfig) {
+            this.uiMessagesConfig.init();
+            UIMessagesService.init(this.uiMessagesConfig);
+        } else {
+            console.warn('[GameBootstrap] UIMessagesConfig не назначен — UI-сообщения отключены');
+        }
+        if (this.holeController) {
+            HoleGrowthService.init(this.holeController.node);
+        } else {
+            console.warn('[GameBootstrap] HoleController не назначен — HoleGrowthService без tween scale');
+        }
         DoorService.init();
         // После DoorService: коллекции слушают DOOR_OPENED и включают следующий цвет
         CollectableCollectionService.init();
         ParticleService.init();
+        // #region agent log
+        fetch('http://127.0.0.1:7681/ingest/62937d31-24ee-45cd-bae7-0a88a5b27d0d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'904b78'},body:JSON.stringify({sessionId:'904b78',runId:'pre-fix',hypothesisId:'A,D',location:'GameBootstrap.ts:_boot',message:'before OptimizationService.init',data:{hasOptConfig:!!this.optimizationConfig,optConfigValid:!!(this.optimizationConfig&&this.optimizationConfig.isValid),optNodeActive:this.optimizationConfig?this.optimizationConfig.node?.active:null,hasHole:!!this.holeController},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
         OptimizationService.init(
             this.optimizationConfig,
             this.holeController ? this.holeController.node : null
@@ -162,6 +191,8 @@ export class GameBootstrap extends Component {
         }
 
         const ui = this.uiConfig;
+
+        UIAnimationService.init(ui);
 
         // GameplayState UI — remaining counters
         if (ui.remainingBlueLabel && ui.remainingRedLabel && ui.remainingGreenLabel && ui.remainingTealLabel) {
@@ -226,9 +257,13 @@ export class GameBootstrap extends Component {
         CollectableCollectionService.destroy();
         DoorService.destroy();
         HoleGrowthService.destroy();
+        UIAnimationService.destroy();
+        TweenService.destroy();
+        UIMessagesService.destroy();
         ParticleService.destroy();
         OptimizationService.destroy();
         AudioService.destroy();
+        CameraControlService.destroy();
         this._remainingPresenter?.destroy();
         this._timerPresenter?.destroy();
         this._tutorialPresenter?.destroy();

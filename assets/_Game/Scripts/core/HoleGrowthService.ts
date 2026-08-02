@@ -1,22 +1,33 @@
 /**
  * HoleGrowthService — рост дыры по порогам из LevelConfig.holeSizeThresholds.
- * Слушает ITEM_COLLECTED → пересчитывает scale по collectedCount → GameStore.setHoleScale → HOLE_SIZE_CHANGED.
- * HoleController плавно догоняет целевой масштаб через Lerp.
+ * Слушает ITEM_COLLECTED → пересчитывает scale → GameStore.setHoleScale → HOLE_SIZE_CHANGED
+ * и запускает пружинный tween через TweenService (конфиг дыры — аргументом).
+ *
+ * Plain TS class (не Component). RULES §2.1: нет аллокаций в update().
  */
 
+import { Node, Vec3 } from 'cc';
 import { EventBus, GameEvent } from './EventBus';
 import { GameStore } from './GameStore';
+import { TweenService } from './TweenService';
 import { LEVEL_CONFIG, HoleSizeThreshold } from '../gameplay/LevelConfig';
 
 export interface IHoleGrowthService {
-    init(): void;
+    init(holeNode: Node): void;
     destroy(): void;
 }
 
 class HoleGrowthServiceImpl implements IHoleGrowthService {
     private _subscribed: boolean = false;
+    private _holeNode: Node | null = null;
+    private readonly _initialScale: Vec3 = new Vec3(1, 1, 1);
+    private readonly _targetScale: Vec3 = new Vec3(1, 1, 1);
 
-    init(): void {
+    init(holeNode: Node): void {
+        this._holeNode = holeNode;
+        this._initialScale.set(holeNode.scale);
+        this._targetScale.set(holeNode.scale);
+
         if (!this._subscribed) {
             EventBus.on(GameEvent.ITEM_COLLECTED, this._onItemCollected, this);
             this._subscribed = true;
@@ -27,12 +38,15 @@ class HoleGrowthServiceImpl implements IHoleGrowthService {
     }
 
     destroy(): void {
+        TweenService.stopHoleScaleSpring();
+        this._holeNode = null;
+
         if (!this._subscribed) return;
         EventBus.off(GameEvent.ITEM_COLLECTED, this._onItemCollected, this);
         this._subscribed = false;
     }
 
-    private _onItemCollected = (_payload: { score: number; totalScore: number }): void => {
+    private _onItemCollected = (): void => {
         this._recalculate(GameStore.collectedCount);
     };
 
@@ -41,6 +55,8 @@ class HoleGrowthServiceImpl implements IHoleGrowthService {
 
         const prevScale = GameStore.holeScale;
         const result = this._scaleFromThresholds(collectedCount, LEVEL_CONFIG.holeSizeThresholds);
+        if (result.scale === prevScale) return;
+
         GameStore.setHoleScale(result.scale);
 
         if (result.scale > prevScale) {
@@ -53,7 +69,41 @@ class HoleGrowthServiceImpl implements IHoleGrowthService {
                 ` (${thrLabel})`,
                 'color: #4FC3F7;'
             );
+            this._tweenToScale(result.scale);
+        } else {
+            this._applyScaleImmediate(result.scale);
         }
+    }
+
+    private _tweenToScale(scaleMul: number): void {
+        if (!this._holeNode || !LEVEL_CONFIG) {
+            this._applyScaleImmediate(scaleMul);
+            return;
+        }
+
+        this._targetScale.set(
+            this._initialScale.x * scaleMul,
+            this._initialScale.y,
+            this._initialScale.z * scaleMul
+        );
+
+        TweenService.holeScaleSpring(this._holeNode, this._targetScale, {
+            duration: LEVEL_CONFIG.holeScaleTweenDuration,
+            amplitude: LEVEL_CONFIG.holeScaleElasticAmplitude,
+            period: LEVEL_CONFIG.holeScaleElasticPeriod,
+        });
+    }
+
+    private _applyScaleImmediate(scaleMul: number): void {
+        TweenService.stopHoleScaleSpring();
+        if (!this._holeNode) return;
+
+        this._targetScale.set(
+            this._initialScale.x * scaleMul,
+            this._initialScale.y,
+            this._initialScale.z * scaleMul
+        );
+        this._holeNode.setScale(this._targetScale);
     }
 
     /** Берём порог с максимальным requiredCount среди достигнутых; size — абсолютный от старта */

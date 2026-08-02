@@ -1,10 +1,10 @@
 /**
  * OptimizationConfig — параметры дистанционной активации объектов.
- * Назначается в Inspector на GameBootstrap; список Collectable заполняет CollectablesCollectorTool.
+ * Назначается в Inspector на GameBootstrap; список нод заполняет CollectablesCollectorTool
+ * (ищет Collectable, сохраняет node — ссылки на PrefabInstance так сериализуются).
  */
 
-import { _decorator, Component, CCFloat, CCInteger } from 'cc';
-import { Collectable } from './Collectable';
+import { _decorator, Component, Node, CCFloat, CCInteger } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -13,7 +13,7 @@ export class OptimizationConfig extends Component {
     @property({
         tooltip: 'Включить дистанционную активацию (OptimizationService)',
     })
-    public enabled: boolean = true;
+    public cullingEnabled: boolean = true;
 
     @property({
         type: CCFloat,
@@ -39,8 +39,10 @@ export class OptimizationConfig extends Component {
     public updateIntervalFrames: number = 3;
 
     @property({
-        type: [Collectable],
-        tooltip: 'Объекты под оптимизацией. Заполняет CollectablesCollectorTool → Fetch.',
+        type: [Node],
+        tooltip:
+            'Ноды collectables (с компонентом Collectable). ' +
+            'Заполняет CollectablesCollectorTool → Fetch.',
     })
-    public collectables: Collectable[] = [];
+    public collectables: Node[] = [];
 }

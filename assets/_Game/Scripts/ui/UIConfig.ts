@@ -1,4 +1,5 @@
-import { _decorator, Component, Label, Node, Button, UIOpacity } from 'cc';
+import { _decorator, Component, Label, Node, Button, UIOpacity, CCFloat } from 'cc';
+import { Card } from './Card';
 const { ccclass, property } = _decorator;
 
 /**
@@ -33,6 +34,81 @@ export class UIConfig extends Component {
 
     @property({ type: Label, group: { name: 'GameplayState', id: '2' } })
     remainingTealLabel: Label = null!;
+
+    // ── Color Cards (UIAnimationService) ───────────────────────────────
+    @property({ type: Card, group: { name: 'Color Cards', id: '4' }, tooltip: 'UI-карточка Blue' })
+    blueCard: Card = null!;
+
+    @property({ type: Card, group: { name: 'Color Cards', id: '4' }, tooltip: 'UI-карточка Red' })
+    redCard: Card = null!;
+
+    @property({ type: Card, group: { name: 'Color Cards', id: '4' }, tooltip: 'UI-карточка Teal' })
+    tealCard: Card = null!;
+
+    @property({ type: Card, group: { name: 'Color Cards', id: '4' }, tooltip: 'UI-карточка Green' })
+    greenCard: Card = null!;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Длительность elastic punch карточки (сек)',
+        min: 0.01,
+    })
+    cardAnimDuration: number = 0.45;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Сила overshoot пружины punch (≥1)',
+        min: 1,
+    })
+    cardAnimAmplitude: number = 1.35;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Период колебаний пружины punch (0.3–0.5)',
+        min: 0.05,
+    })
+    cardAnimPeriod: number = 0.4;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Стартовый scale punch относительно base (1.25 = +25%)',
+        min: 0.01,
+    })
+    cardAnimPunchScale: number = 1.25;
+
+    @property({
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Если вкл. — новый collect прерывает текущий punch. Если выкл. — пока играет, новые игнорятся',
+    })
+    cardAnimAllowInterrupt: boolean = false;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Длительность elastic роста CheckSprite (сек)',
+        min: 0.01,
+    })
+    checkAnimDuration: number = 0.5;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Сила overshoot пружины CheckSprite (≥1)',
+        min: 1,
+    })
+    checkAnimAmplitude: number = 1.35;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Color Cards', id: '4' },
+        tooltip: 'Период колебаний пружины CheckSprite (0.3–0.5)',
+        min: 0.05,
+    })
+    checkAnimPeriod: number = 0.4;
 
     // ── EndGameState ───────────────────────────────────────────────────
     @property({ type: Node, group: { name: 'EndGameState', id: '3' }, tooltip: 'Корневая панель EndGame / EndCard' })

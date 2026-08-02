@@ -1,9 +1,9 @@
 /**
- * CollectablesCollectorTool — editor-only: находит все Collectable и пишет в OptimizationConfig.
+ * CollectablesCollectorTool — editor-only: находит все Collectable и пишет их node в OptimizationConfig.
  * Runtime уничтожается. Другие классы НЕ импортируют этот Tool.
  */
 
-import { _decorator, Component, director } from 'cc';
+import { _decorator, Component, Node, director } from 'cc';
 import { EDITOR } from 'cc/env';
 import { Collectable } from '../gameplay/Collectable';
 import { OptimizationConfig } from '../gameplay/OptimizationConfig';
@@ -20,7 +20,9 @@ export class CollectablesCollectorTool extends Component {
     })
     public optimizationConfig: OptimizationConfig = null!;
 
-    @property({ tooltip: 'Нажмите: найти все Collectable в сцене → OptimizationConfig.collectables' })
+    @property({
+        tooltip: 'Нажмите: найти все Collectable в сцене → OptimizationConfig.collectables (Node)',
+    })
     public get fetchButton(): boolean {
         return false;
     }
@@ -64,18 +66,18 @@ export class CollectablesCollectorTool extends Component {
         }
 
         const found = scene.getComponentsInChildren(Collectable);
-        const list: Collectable[] = [];
+        const list: Node[] = [];
         for (let i = 0; i < found.length; i++) {
             const c = found[i];
-            if (c && c.isValid) {
-                list.push(c);
+            if (c && c.isValid && c.node && c.node.isValid) {
+                list.push(c.node);
             }
         }
 
         cfg.collectables = list;
 
         console.log(
-            `[CollectablesCollectorTool] Записано Collectable=${list.length} → ` +
+            `[CollectablesCollectorTool] Записано Node=${list.length} (из Collectable) → ` +
             `OptimizationConfig на "${cfg.node.name}"`
         );
     }

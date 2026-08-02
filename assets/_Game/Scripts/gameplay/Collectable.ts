@@ -71,6 +71,7 @@ export class Collectable extends Component {
         EventBus.emit(GameEvent.ITEM_COLLECTED, {
             score:      this.scoreValue,
             totalScore: GameStore.score,
+            type:       this.type,
         });
 
         const startPos = this.node.worldPosition.clone();

@@ -76,7 +76,7 @@ class AudioServiceImpl implements IAudioService {
         this._lastHoleScale = 1;
     }
 
-    private _onItemCollected = (_payload: { score: number; totalScore: number }): void => {
+    private _onItemCollected = (): void => {
         if (!this._config) return;
         this._playCollect();
     };

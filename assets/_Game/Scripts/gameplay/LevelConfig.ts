@@ -27,8 +27,14 @@ export class LevelConfig extends Component {
     @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Максимальная физическая скорость дыры (hard clamp |v|). Достигается при свайпе ≥ maxSwipePct; быстрее разогнаться нельзя.' })
     holeMaxSpeed: number = 18;
 
-    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость Lerp-сглаживания масштаба дыры (выше = быстрее догоняет целевой scale)' })
-    holeScaleLerpSpeed: number = 10;
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Длительность tween роста дыры (сек). Для пружины лучше 0.5–0.8' })
+    holeScaleTweenDuration: number = 0.55;
+
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Сила overshoot пружины (≥1). 1.0 ≈ без вылета, 1.2–1.5 — заметный «вырос сильнее → сел»' })
+    holeScaleElasticAmplitude: number = 1.35;
+
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Период колебаний пружины. Меньше — чаще дребезг, больше — одно мягкое упругое торможение (0.3–0.5)' })
+    holeScaleElasticPeriod: number = 0.4;
 
     @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость сглаживания скорости дыры (выше = резче смена направления, ниже = плавнее)' })
     velocityLerpSpeed: number = 18;
@@ -110,32 +116,28 @@ export class LevelConfig extends Component {
     @property({ group: { name: 'UI Settings', id: '5' } })
     endCardPopScale: number = 0.7;
 
-    // ── Камера ─────────────────────────────────────────────────────────
-    @property({ group: { name: 'Camera Settings', id: '6' } })
-    cameraLerpSpeed: number = 5;
-
     // ── Коллекции (физика по цветам) ───────────────────────────────────
-    @property({ type: CollectableContainer, group: { name: 'Collections', id: '7' }, tooltip: 'CollectableContainer для Blue' })
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Blue' })
     collectionBlue: CollectableContainer = null!;
 
-    @property({ type: CollectableContainer, group: { name: 'Collections', id: '7' }, tooltip: 'CollectableContainer для Red' })
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Red' })
     collectionRed: CollectableContainer = null!;
 
-    @property({ type: CollectableContainer, group: { name: 'Collections', id: '7' }, tooltip: 'CollectableContainer для Green' })
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Green' })
     collectionGreen: CollectableContainer = null!;
 
-    @property({ type: CollectableContainer, group: { name: 'Collections', id: '7' }, tooltip: 'CollectableContainer для Teal' })
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Teal' })
     collectionTeal: CollectableContainer = null!;
 
     @property({
         type: [CollectableContainer],
-        group: { name: 'Collections', id: '7' },
+        group: { name: 'Collections', id: '6' },
         tooltip: 'Порядок активации коллекций. Первый — старт. После полного сбора включается следующий в списке. Пример: Blue → Red → Teal → Green.',
     })
     collectionProgression: CollectableContainer[] = [];
 
     @property({
-        group: { name: 'Collections', id: '7' },
+        group: { name: 'Collections', id: '6' },
         tooltip: 'Процент RigidBody (0..100), у которых вызывается wakeUp при активации контейнера. 33 ≈ треть.',
         range: [0, 100],
         slide: true,
@@ -180,23 +182,55 @@ export class LevelConfig extends Component {
     }
 
     // ── Двери (открываются при полном сборе типа) ──────────────────────
-    @property({ type: Node, group: { name: 'Doors', id: '8' }, tooltip: 'Дверь для Blue (TYPE_BLUE_CLEARED)' })
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Blue (TYPE_BLUE_CLEARED)' })
     doorBlue: Node = null!;
 
-    @property({ type: Node, group: { name: 'Doors', id: '8' }, tooltip: 'Дверь для Red (TYPE_RED_CLEARED)' })
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Red (TYPE_RED_CLEARED)' })
     doorRed: Node = null!;
 
-    @property({ type: Node, group: { name: 'Doors', id: '8' }, tooltip: 'Дверь для Green (TYPE_GREEN_CLEARED)' })
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Green (TYPE_GREEN_CLEARED)' })
     doorGreen: Node = null!;
 
-    @property({ type: Node, group: { name: 'Doors', id: '8' }, tooltip: 'Дверь для Teal (TYPE_TEAL_CLEARED)' })
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Teal (TYPE_TEAL_CLEARED)' })
     doorTeal: Node = null!;
 
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'Длительность подскока ворот вверх (сек)',
+        min: 0.01,
+    })
+    gateOpenJumpTime: number = 0.15;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'Высота подскока ворот (local Y)',
+        min: 0.01,
+    })
+    gateOpenJumpHeight: number = 1;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'Длительность ускоренного падения ворот вниз (сек)',
+        min: 0.01,
+    })
+    gateOpenFallTime: number = 0.35;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'На сколько вниз падает View ворот от старта (local Y)',
+        min: 0.01,
+    })
+    gateOpenSlideDistance: number = 6;
+
     // ── Particles (VFX на сцене) ────────────────────────────────────────
-    @property({ type: ParticleSystem, group: { name: 'Particles', id: '9' }, tooltip: 'Confetti ParticleSystem (one-shot через ParticleService.playConfetti)' })
+    @property({ type: ParticleSystem, group: { name: 'Particles', id: '8' }, tooltip: 'Confetti ParticleSystem (one-shot через ParticleService.playConfetti)' })
     particleConfetti: ParticleSystem = null!;
 
-    @property({ type: ParticleSystem, group: { name: 'Particles', id: '9' }, tooltip: 'Sparkles ParticleSystem (one-shot через ParticleService.playSparkles)' })
+    @property({ type: ParticleSystem, group: { name: 'Particles', id: '8' }, tooltip: 'Sparkles ParticleSystem (one-shot через ParticleService.playSparkles)' })
     particleSparkles: ParticleSystem = null!;
 }
 

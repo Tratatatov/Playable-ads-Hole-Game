@@ -15,10 +15,19 @@ export class HoleMovement {
     private readonly _targetVel: Vec3 = new Vec3();
     private readonly _newPos: Vec3 = new Vec3();
 
-    /** Сбросить сглаженную скорость (стоп). */
-    reset(): void {
+    /** Текущая сглаженная скорость (|v|). */
+    get currentSpeed(): number {
+        return this._currentVel.length();
+    }
+
+    /**
+     * Сбросить сглаженную скорость (стоп).
+     * Если передан rigidBody — сразу обнуляет и физическую velocity.
+     */
+    reset(rigidBody: RigidBody | null = null): void {
         this._currentVel.set(0, 0, 0);
         this._targetVel.set(0, 0, 0);
+        rigidBody?.setLinearVelocity(this._currentVel);
     }
 
     /**
@@ -51,7 +60,12 @@ export class HoleMovement {
         }
     }
 
-    /** Целевая velocity из инпута + hard clamp |v| ≤ holeMaxSpeed. */
+    /**
+     * Целевая velocity из инпута.
+     * Направление — normalized (как Vector3.normalized в Unity): |dir| = 1,
+     * затем * speed. По диагонали скорость не больше, чем по оси.
+     * |v| hard-clamp по holeMaxSpeed.
+     */
     private _computeTargetVelocity(out: Vec3): void {
         if (!InputService.isTouching) {
             out.set(0, 0, 0);
@@ -85,17 +99,8 @@ export class HoleMovement {
         const maxSpeed = Math.max(minSpeed, LEVEL_CONFIG.holeMaxSpeed);
         const speed = Math.min(maxSpeed, minSpeed + (maxSpeed - minSpeed) * t);
 
+        // Unity-style: dir.normalized * speed  →  |v| === speed (и на диагонали тоже)
         const inv = 1 / offsetMag;
         out.set(ox * inv * speed, 0, oz * inv * speed);
-
-        // Hard clamp velocity
-        const lenSq = out.lengthSqr();
-        const maxSq = maxSpeed * maxSpeed;
-        if (lenSq > maxSq) {
-            const s = maxSpeed / Math.sqrt(lenSq);
-            out.x *= s;
-            out.y = 0;
-            out.z *= s;
-        }
     }
 }

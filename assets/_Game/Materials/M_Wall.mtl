@@ -83,8 +83,15 @@
         "y": 0.17144127190113068,
         "z": 0.26225075125694275
       },
-      "roughness": 0.74,
-      "specularIntensity": 0.767
+      "roughness": 0.859,
+      "specularIntensity": 0.772,
+      "emissive": {
+        "__type__": "cc.Color",
+        "r": 29,
+        "g": 97,
+        "b": 100,
+        "a": 255
+      }
     },
     {},
     {},
