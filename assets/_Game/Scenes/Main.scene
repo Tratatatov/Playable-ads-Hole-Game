@@ -10000,6 +10000,8 @@
     "centerY": 0,
     "tipOffsetX": 0,
     "tipOffsetY": 0,
+    "fadeDuration": 0.3,
+    "hintActiveSeconds": 5,
     "_id": "33bAMVOsJPV60U4vUrKbGi"
   },
   {
@@ -96068,7 +96070,7 @@
     "_enabled": true,
     "__prefab": null,
     "cullingEnabled": true,
-    "activationDistance": 20,
+    "activationDistance": 27,
     "deactivationPadding": 3,
     "updateIntervalFrames": 3,
     "maxTogglesPerPass": 8,
