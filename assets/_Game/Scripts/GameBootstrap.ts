@@ -1,27 +1,53 @@
 /**
- * GameBootstrap — точка входа игры. Заменяет Player.ts.
+ * GameBootstrap — точка входа игры.
  * Последовательность:
- *   1. BootState: prewarm пула, размещение коллектаблов, AdNetworkManager.gameReady()
- *   2. TutorialState: ждём первый тач
- *   3. GameplayState: таймер тикает, игрок двигается
- *   4. EndCardState: показываем EndCard
+ *   1. Boot: инициализация сервисов, UI, AdNetworkManager.gameReady()
+ *   2. CameraIntroState: пролёт камеры A→B, без управления
+ *   3. TutorialState: ждём первый тач, показываем tutorial UI
+ *   4. GameplayState: таймер тикает, игрок двигается
+ *   5. EndGameState: отключаем ввод, показываем EndGame UI
  *
  * RULES §1.2: Жизненный цикл строго инкапсулирован в FSM.
  */
 
-import { _decorator, Component, Vec3, director, Texture2D, Node } from 'cc';
+import { _decorator, Component, Node } from 'cc';
 import { EventBus, GameEvent } from './core/EventBus';
 import { GameStateMachine, GameState } from './core/GameStateMachine';
 import { GameStore } from './core/GameStore';
 import { AdNetworkManager } from './core/AdNetworkManager';
-import { InputService } from './core/InputService';
 import { CameraControlService } from './core/CameraControlService';
-import { CollectablePool } from './gameplay/CollectablePool';
+import { CameraConfig } from './core/CameraConfig';
+import { TimerService } from './core/TimerService';
+import { CollectableCounterService } from './core/CollectableCounterService';
+import { HoleGrowthService } from './core/HoleGrowthService';
+import { DoorService } from './core/DoorService';
+import { CollectableCollectionService } from './core/CollectableCollectionService';
+import { AudioService } from './core/AudioService';
+import { AudioConfig } from './core/AudioConfig';
+import { ParticleService } from './core/ParticleService';
+import { TweenService } from './core/TweenService';
+import { CameraIntroState } from './core/states/CameraIntroState';
+import { TutorialState } from './core/states/TutorialState';
+import { GameplayState } from './core/states/GameplayState';
+import { EndGameState } from './core/states/EndGameState';
 import { HoleController } from './gameplay/HoleController';
 import { LevelConfig, setLevelConfig } from './gameplay/LevelConfig';
-import { HUD } from './ui/HUD';
-import { TutorialUI } from './ui/TutorialUI';
-import { EndCard } from './ui/EndCard';
+import { BatchingConfig, setBatchingConfig } from './gameplay/BatchingConfig';
+import { OptimizationConfig } from './gameplay/OptimizationConfig';
+import { OptimizationService } from './core/OptimizationService';
+import { UIConfig } from './ui/UIConfig';
+import { UIMessagesConfig } from './ui/UIMessagesConfig';
+import { UIMessagesService } from './ui/UIMessagesService';
+import { UIAnimationService } from './ui/UIAnimationService';
+import { TimerView } from './ui/TimerView';
+import { TimerPresenter } from './ui/TimerPresenter';
+import { TutorialView } from './ui/TutorialView';
+import { TutorialPresenter } from './ui/TutorialPresenter';
+import { TutorialFinger } from './ui/TutorialFinger';
+import { EndCardView } from './ui/EndCardView';
+import { EndCardPresenter } from './ui/EndCardPresenter';
+import { RemainingCollectablesView } from './ui/RemainingCollectablesView';
+import { RemainingCollectablesPresenter } from './ui/RemainingCollectablesPresenter';
 
 const { ccclass, property } = _decorator;
 
@@ -33,54 +59,47 @@ export class GameBootstrap extends Component {
     @property(Node)
     mainCamera: Node = null!;
 
-    @property({ type: [Texture2D], tooltip: 'Blue, Red, Green, Turquoise' })
-    collectableTextures: Texture2D[] = [];
-
     @property(LevelConfig)
     levelConfig: LevelConfig = null!;
+
+    @property(UIConfig)
+    uiConfig: UIConfig = null!;
+
+    @property(UIMessagesConfig)
+    uiMessagesConfig: UIMessagesConfig = null!;
+
+    @property(AudioConfig)
+    audioConfig: AudioConfig = null!;
+
+    @property(CameraConfig)
+    cameraConfig: CameraConfig = null!;
+
+    @property(BatchingConfig)
+    batchingConfig: BatchingConfig = null!;
+
+    @property(OptimizationConfig)
+    optimizationConfig: OptimizationConfig = null!;
 
     @property(HoleController)
     holeController: HoleController = null!;
 
-    @property(CollectablePool)
-    collectablePool: CollectablePool = null!;
-
-    @property(HUD)
-    hud: HUD = null!;
-
-    @property(TutorialUI)
-    tutorialUI: TutorialUI = null!;
-
-    @property(EndCard)
-    endCard: EndCard = null!;
-
-    // ── Scratch-переменная для размещения коллектаблов (no new in runtime) ──
-    private readonly _spawnPos: Vec3 = new Vec3();
-
-    // ── Таймер (без setInterval — управляется в update) ──────────────────
-    private _timerRunning: boolean = false;
-    private _timeAccum: number = 0;
+    private _timerPresenter: TimerPresenter | null = null;
+    private _tutorialPresenter: TutorialPresenter | null = null;
+    private _endCardPresenter: EndCardPresenter | null = null;
+    private _remainingPresenter: RemainingCollectablesPresenter | null = null;
 
     start(): void {
-        // Устанавливаем глобальный конфиг до любой инициализации
         setLevelConfig(this.levelConfig);
+        setBatchingConfig(this.batchingConfig);
         this._boot();
     }
 
     update(dt: number): void {
-        if (!this._timerRunning) return;
-        this._timeAccum += dt;
-        // Тикаем каждую секунду
-        const elapsed = Math.floor(this._timeAccum);
-        const timeLeft = this.levelConfig.totalTime - elapsed;
-        GameStore.setTimeLeft(timeLeft);
-        if (timeLeft <= 0) {
-            this._endGame();
-        }
+        TimerService.update(dt);
+        OptimizationService.update(dt);
     }
 
     lateUpdate(dt: number): void {
-        // Камера обновляется в lateUpdate, чтобы следовать за уже сдвинувшимся игроком
         CameraControlService.update(dt);
     }
 
@@ -89,90 +108,177 @@ export class GameBootstrap extends Component {
     private _boot(): void {
         console.log('[GameBootstrap] Начало инициализации...');
 
-        // 0. Initialize components
-        console.log('[Регистрация сервисов] Инициализация контроллеров сцены (Hole, HUD, UI)');
+        // 0. Initialize scene controllers
         this.holeController?.init();
-        this.hud?.init();
-        this.tutorialUI?.init();
-        this.endCard?.init();
         if (this.mainCamera && this.holeController) {
-            CameraControlService.init(this.mainCamera, this.holeController.node);
+            if (!this.cameraConfig) {
+                console.warn('[GameBootstrap] CameraConfig не назначен — камера с дефолтными параметрами');
+            }
+            CameraControlService.init(this.mainCamera, this.holeController.node, this.cameraConfig);
         }
 
-        // 1. Prewarm пула
-        if (this.collectablePool) {
-            console.log('[Регистрация сервисов] Prewarm пула коллектаблов');
-            this.collectablePool.setTextures(this.collectableTextures);
-            this.collectablePool.prewarm();
-        }
+        this._initUI();
 
-        // 2. Сбросить состояние
-        console.log('[GameBootstrap] Сброс состояния игры');
+        // 1. Сбросить состояние
         GameStore.reset();
 
-        // 3. Коллектаблы спавнятся при первом тач (не на старте)
+        // 2. Сервисы
+        CollectableCounterService.init();
+        TimerService.init(this.levelConfig.totalTime);
+        TweenService.init();
+        if (this.uiMessagesConfig) {
+            this.uiMessagesConfig.init();
+            UIMessagesService.init(this.uiMessagesConfig);
+        } else {
+            console.warn('[GameBootstrap] UIMessagesConfig не назначен — UI-сообщения отключены');
+        }
+        if (this.holeController) {
+            HoleGrowthService.init(this.holeController.node);
+        } else {
+            console.warn('[GameBootstrap] HoleController не назначен — HoleGrowthService без tween scale');
+        }
+        DoorService.init();
+        // После DoorService: коллекции слушают DOOR_OPENED и включают следующий цвет
+        CollectableCollectionService.init();
+        ParticleService.init(this.uiMessagesConfig?.perfectMessageParticles ?? null);
 
-        // 4. Уведомить рекламную сеть (RULES §1.3)
-        console.log('[GameBootstrap] Уведомление AdNetworkManager: gameReady');
+        OptimizationService.init(
+            this.optimizationConfig,
+            this.mainCamera ? this.mainCamera : null
+        );
+
+        if (this.audioConfig) {
+            AudioService.init(this.audioConfig);
+        } else {
+            console.warn('[GameBootstrap] AudioConfig не назначен — SFX отключены');
+        }
+
+        if (!this.batchingConfig) {
+            console.warn('[GameBootstrap] BatchingConfig не назначен — активация коллекций с defaults');
+        }
+
+        if (!this.optimizationConfig) {
+            console.warn('[GameBootstrap] OptimizationConfig не назначен — distance culling выкл.');
+        }
+
+        // 3. Рекламная сеть
         AdNetworkManager.gameReady();
 
-        // 5. Включить обработку ввода (InputService)
-        console.log('[Регистрация сервисов] Включение InputService');
-        InputService.enable();
+        // 4. Ввод включается в TutorialState (после пролёта камеры)
 
-        // 6. FSM: Boot → Tutorial
-        console.log('[GameBootstrap] Переход в TutorialState');
-        GameStateMachine.transition(GameState.Tutorial);
+        // 5. Зарегистрировать фазы игрового цикла
+        GameStateMachine.register(GameState.CameraIntro, new CameraIntroState(this.cameraConfig));
+        GameStateMachine.register(GameState.Tutorial, new TutorialState(this._tutorialPresenter));
+        GameStateMachine.register(GameState.Gameplay, new GameplayState());
+        GameStateMachine.register(GameState.EndGame, new EndGameState(this._endCardPresenter));
 
-        // 7. Подписаться на геймплей-события
+        // 6. Переходы: intro done → Tutorial; первый тач → Gameplay; таймер истёк → EndGame
+        EventBus.on(GameEvent.CAMERA_INTRO_COMPLETE, this._onCameraIntroComplete, this);
         EventBus.on(GameEvent.FIRST_TOUCH, this._onFirstTouch, this);
-        EventBus.on(GameEvent.GAME_START, this._onGameStart, this);
-        EventBus.on(GameEvent.GAME_END, this._onGameEnd, this);
+        EventBus.on(GameEvent.TIMER_EXPIRED, this._onTimerExpired, this);
+
+        // 7. Boot → CameraIntro
+        console.log('[GameBootstrap] Переход в CameraIntroState');
+        GameStateMachine.transition(GameState.CameraIntro);
 
         console.log('[GameBootstrap] Инициализация завершена!');
     }
 
-    private _spawnCollectables(): void {
-        if (!this.collectablePool) return;
-        const half = this.levelConfig.arenaHalfSize - 1;
-        for (let i = 0; i < this.levelConfig.collectableCount; i++) {
-            // Случайная позиция на арене (scratch-вектор переиспользуется)
-            this._spawnPos.set(
-                (Math.random() * 2 - 1) * half,
-                0.15,
-                (Math.random() * 2 - 1) * half,
+    private _initUI(): void {
+        if (!this.uiConfig) {
+            console.warn('[GameBootstrap] UIConfig не назначен');
+            return;
+        }
+
+        const ui = this.uiConfig;
+
+        UIAnimationService.init(ui);
+
+        // GameplayState UI — remaining counters
+        if (ui.remainingBlueLabel && ui.remainingRedLabel && ui.remainingGreenLabel && ui.remainingTealLabel) {
+            const remainingView = new RemainingCollectablesView(
+                ui.remainingBlueLabel,
+                ui.remainingRedLabel,
+                ui.remainingGreenLabel,
+                ui.remainingTealLabel
             );
-            const typeIdx = Math.floor(Math.random() * 4);
-            this.collectablePool.acquire(this._spawnPos, typeIdx);
+            this._remainingPresenter = new RemainingCollectablesPresenter(remainingView);
+            this._remainingPresenter.init();
+        }
+
+        // GameplayState UI — timer
+        if (ui.hudTimerLabel) {
+            const timerView = new TimerView(ui.hudTimerLabel);
+            this._timerPresenter = new TimerPresenter(timerView);
+            this._timerPresenter.init();
+        }
+
+        // TutorialState UI — достаточно пальца; panel/opacity опциональны
+        const finger =
+            ui.tutorialFinger
+            ?? ui.tutorialFingerNode?.getComponent(TutorialFinger)
+            ?? (ui.tutorialFingerNode ? ui.tutorialFingerNode.addComponent(TutorialFinger) : null);
+
+        if (finger) {
+            const tutorialView = new TutorialView(
+                finger,
+                ui.tutorialPanel
+            );
+            this._tutorialPresenter = new TutorialPresenter(tutorialView);
+            this._tutorialPresenter.init();
+        } else {
+            console.warn('[GameBootstrap] TutorialFinger / tutorialFingerNode не назначен в UIConfig');
+        }
+
+        // EndGameState UI
+        if (ui.endCardPanel && ui.endCardOpacity && ui.endCardCtaButton && ui.endCardCtaLabel) {
+            const endCardView = new EndCardView(
+                ui.endCardPanel,
+                ui.endCardOpacity,
+                ui.endCardCtaButton,
+                ui.endCardCtaLabel
+            );
+            this._endCardPresenter = new EndCardPresenter(endCardView);
+            this._endCardPresenter.init();
+        } else {
+            console.warn('[GameBootstrap] EndGameState UI не полностью назначен в UIConfig');
         }
     }
 
+    private _onCameraIntroComplete = (): void => {
+        // После пролёта — distance soft-cull (всё было видно на intro через resetAll)
+        OptimizationService.applyNow();
+        console.log('[GameBootstrap] Пролёт камеры завершён → TutorialState');
+        GameStateMachine.transition(GameState.Tutorial);
+    };
+
     private _onFirstTouch = (): void => {
-        console.log('[GameBootstrap] Первый тач! Переход в GameplayState');
-        // Спавним коллектаблы только сейчас, чтобы они не были видны до старта
-        this._spawnCollectables();
+        console.log('[GameBootstrap] Первый тач → GameplayState');
         GameStateMachine.transition(GameState.Gameplay);
-        EventBus.emit(GameEvent.GAME_START, undefined as never);
     };
 
-    private _onGameStart = (): void => {
-        this._timerRunning = true;
-        this._timeAccum = 0;
+    private _onTimerExpired = (): void => {
+        console.log('[GameBootstrap] Таймер истёк → EndGameState');
+        GameStateMachine.transition(GameState.EndGame);
     };
-
-    private _onGameEnd = (): void => {
-        this._timerRunning = false;
-    };
-
-    private _endGame(): void {
-        this._timerRunning = false;
-        InputService.disable();
-        EventBus.emit(GameEvent.GAME_END, { score: GameStore.score });
-    }
 
     onDestroy(): void {
+        EventBus.off(GameEvent.CAMERA_INTRO_COMPLETE, this._onCameraIntroComplete, this);
         EventBus.off(GameEvent.FIRST_TOUCH, this._onFirstTouch, this);
-        EventBus.off(GameEvent.GAME_START, this._onGameStart, this);
-        EventBus.off(GameEvent.GAME_END, this._onGameEnd, this);
+        EventBus.off(GameEvent.TIMER_EXPIRED, this._onTimerExpired, this);
+        CollectableCollectionService.destroy();
+        DoorService.destroy();
+        HoleGrowthService.destroy();
+        UIAnimationService.destroy();
+        TweenService.destroy();
+        UIMessagesService.destroy();
+        ParticleService.destroy();
+        OptimizationService.destroy();
+        AudioService.destroy();
+        CameraControlService.destroy();
+        this._remainingPresenter?.destroy();
+        this._timerPresenter?.destroy();
+        this._tutorialPresenter?.destroy();
+        this._endCardPresenter?.destroy();
     }
 }

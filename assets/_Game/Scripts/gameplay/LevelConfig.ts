@@ -4,67 +4,70 @@
  * RULES §5.2: Запрещено хардкодить игровые параметры внутри компонентов.
  */
 
-import { _decorator, Component, CCInteger, CCFloat, Vec3 } from 'cc';
+import { _decorator, Component, CCInteger, CCFloat, Node, ParticleSystem } from 'cc';
+import { CollectableType } from './Collectable';
+import { CollectableContainer } from './CollectableContainer';
 const { ccclass, property } = _decorator;
 
 @ccclass('HoleSizeThreshold')
 export class HoleSizeThreshold {
-    @property({ type: CCInteger, tooltip: 'При каком счёте срабатывает' })
-    scoreThreshold: number = 10;
+    @property({ type: CCInteger, tooltip: 'Сколько Collectable нужно собрать (штук) для этого размера' })
+    requiredCount: number = 10;
 
-    @property({ type: CCFloat, tooltip: 'Дополнительный масштаб (additive к базе 1.0)' })
-    sizeIncrease: number = 0.25;
+    @property({ type: CCFloat, tooltip: 'Целевой размер дыры от начального (1 = старт, 1.25 = +25%, 1.5 = +50%)' })
+    size: number = 1.25;
 }
 
 @ccclass('LevelConfig')
 export class LevelConfig extends Component {
     // ── Дыра ──────────────────────────────────────────────────────────
-    @property({ group: { name: 'Hole Settings', id: '1' } })
-    holeDefaultSpeed: number = 6;
-
-    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Коэффициент прироста скорости за каждый +1 scale' })
-    speedScaleMult: number = 0.4;
-
-    @property({ group: { name: 'Hole Settings', id: '1' } })
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость дыры при минимальном свайпе (на границе deadzone). Плавно растёт к max вместе с % свайпа.' })
     holeMinSpeed: number = 3;
 
-    @property({ group: { name: 'Hole Settings', id: '1' } })
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Максимальная физическая скорость дыры (hard clamp |v|). Достигается при свайпе ≥ maxSwipePct; быстрее разогнаться нельзя.' })
     holeMaxSpeed: number = 18;
 
-    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Прирост масштаба дыры за каждый собранный предмет' })
-    holeGrowthPerItem: number = 0.05;
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Длительность tween роста дыры (сек). Для пружины лучше 0.5–0.8' })
+    holeScaleTweenDuration: number = 0.55;
 
-    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость Lerp-сглаживания масштаба дыры' })
-    holeScaleLerpSpeed: number = 10;
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Сила overshoot пружины (≥1). 1.0 ≈ без вылета, 1.2–1.5 — заметный «вырос сильнее → сел»' })
+    holeScaleElasticAmplitude: number = 1.35;
 
-    @property({ group: { name: 'Hole Settings', id: '1' } })
-    holeSizeTweenTime: number = 0.35;
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Период колебаний пружины. Меньше — чаще дребезг, больше — одно мягкое упругое торможение (0.3–0.5)' })
+    holeScaleElasticPeriod: number = 0.4;
 
-    @property({ type: [HoleSizeThreshold], group: { name: 'Hole Settings', id: '1' } })
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость сглаживания скорости дыры (выше = резче смена направления, ниже = плавнее)' })
+    velocityLerpSpeed: number = 18;
+
+    @property({ type: [HoleSizeThreshold], group: { name: 'Hole Settings', id: '1' }, tooltip: 'Пороги роста дыры: при collectedCount ≥ requiredCount масштаб → size (от начального). Пример: 150 → 1.25, 300 → 1.5' })
     holeSizeThresholds: HoleSizeThreshold[] = [];
 
     // ── Уровень ────────────────────────────────────────────────────────
-    @property({ group: { name: 'Level Settings', id: '2' }, tooltip: 'Длительность уровня (сек)' })
+    @property({ group: { name: 'Level Settings', id: '2' }, tooltip: 'Начальное время обратного таймера (секунды). На UI отображается как M:SS, например 90 → "1:30"' })
     totalTime: number = 60;
 
     // ── Коллектаблы ────────────────────────────────────────────────────
-    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Кол-во предметов на сцене одновременно' })
-    collectableCount: number = 25;
+    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Сколько Blue нужно собрать (обратный отсчёт)' })
+    collectableTargetBlue: number = 0;
 
-    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Очки за каждый предмет' })
-    collectableScore: number = 5;
+    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Сколько Red нужно собрать (обратный отсчёт)' })
+    collectableTargetRed: number = 0;
 
-    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Половина стороны арены (world units)' })
-    arenaHalfSize: number = 9;
+    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Сколько Green нужно собрать (обратный отсчёт)' })
+    collectableTargetGreen: number = 0;
 
-    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Min Y позиции спавна' })
-    collectableMinY: number = 0.15;
+    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Сколько Teal нужно собрать (обратный отсчёт)' })
+    collectableTargetTeal: number = 0;
 
-    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Max Y позиции спавна' })
-    collectableMaxY: number = 0.15;
-
-    @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Доп. объектов в пуле сверх collectableCount' })
-    poolWarmupExtra: number = 5;
+    /** Целевые количества по типам для CollectableCounterService */
+    public getCollectableTargets(): Record<CollectableType, number> {
+        return {
+            [CollectableType.Blue]: this.collectableTargetBlue,
+            [CollectableType.Red]: this.collectableTargetRed,
+            [CollectableType.Green]: this.collectableTargetGreen,
+            [CollectableType.Teal]: this.collectableTargetTeal,
+        };
+    }
 
     @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Время анимации подпрыгивания перед падением' })
     jumpAnimTime: number = 0.15;
@@ -81,9 +84,18 @@ export class LevelConfig extends Component {
     @property({ group: { name: 'Collectables', id: '3' }, tooltip: 'Целевой масштаб при падении' })
     fallAnimScale: number = 0.2;
 
-    // ── Controls ───────────────────────────────────────────────────────
-    @property({ group: { name: 'Controls', id: '4' }, tooltip: 'Чувствительность свайпа' })
-    inputSensitivity: number = 100;
+    // ── Controls (доли короткой стороны экрана, 0..1) ─────────────────
+    @property({ group: { name: 'Controls', id: '4' }, tooltip: '[Touch] Смещение пальца (доля экрана) для максимальной скорости. 0.2 = 20% короткой стороны.' })
+    inputMaxSwipePct: number = 0.2;
+
+    @property({ group: { name: 'Controls', id: '4' }, tooltip: '[Touch] Смещение пальца (доля экрана) для минимальной скорости. Ниже — стоп. Между min и max — lerp скорости.' })
+    inputMinSwipePct: number = 0.02;
+
+    @property({ group: { name: 'Controls', id: '4' }, tooltip: '[Mouse] Смещение курсора для максимальной скорости. Больше значение = менее чувствительно (нужен больший ход мыши).' })
+    mouseMaxSwipePct: number = 0.45;
+
+    @property({ group: { name: 'Controls', id: '4' }, tooltip: '[Mouse] Deadzone курсора. Ниже — стоп.' })
+    mouseMinSwipePct: number = 0.04;
 
     // ── UI Settings ────────────────────────────────────────────────────
     @property({ group: { name: 'UI Settings', id: '5' } })
@@ -96,20 +108,128 @@ export class LevelConfig extends Component {
     scorePunchTime: number = 0.1;
 
     @property({ group: { name: 'UI Settings', id: '5' } })
-    tutorialFingerRange: number = 30;
-
-    @property({ group: { name: 'UI Settings', id: '5' } })
-    tutorialAnimTime: number = 0.7;
-
-    @property({ group: { name: 'UI Settings', id: '5' } })
     endCardPopScale: number = 0.7;
 
-    @property({ group: { name: 'UI Settings', id: '5' } })
-    endCardAnimTime: number = 0.35;
+    // ── Коллекции (физика по цветам) ───────────────────────────────────
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Blue' })
+    collectionBlue: CollectableContainer = null!;
 
-    // ── Камера ─────────────────────────────────────────────────────────
-    @property({ group: { name: 'Camera Settings', id: '6' } })
-    cameraLerpSpeed: number = 5;
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Red' })
+    collectionRed: CollectableContainer = null!;
+
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Green' })
+    collectionGreen: CollectableContainer = null!;
+
+    @property({ type: CollectableContainer, group: { name: 'Collections', id: '6' }, tooltip: 'CollectableContainer для Teal' })
+    collectionTeal: CollectableContainer = null!;
+
+    @property({
+        type: [CollectableContainer],
+        group: { name: 'Collections', id: '6' },
+        tooltip: 'Порядок активации коллекций. Первый — старт. После полного сбора включается следующий в списке. Пример: Blue → Red → Teal → Green.',
+    })
+    collectionProgression: CollectableContainer[] = [];
+
+    @property({
+        group: { name: 'Collections', id: '6' },
+        tooltip: 'Процент RigidBody (0..100), у которых вызывается wakeUp при активации контейнера. 33 ≈ треть.',
+        range: [0, 100],
+        slide: true,
+    })
+    wakeUpPercent: number = 33;
+
+    /** Контейнер по типу цвета */
+    public getCollection(type: CollectableType): CollectableContainer | null {
+        switch (type) {
+            case CollectableType.Blue: return this.collectionBlue;
+            case CollectableType.Red: return this.collectionRed;
+            case CollectableType.Green: return this.collectionGreen;
+            case CollectableType.Teal: return this.collectionTeal;
+            default: return null;
+        }
+    }
+
+    /** Стартовая коллекция — первый элемент progression */
+    public getInitialCollection(): CollectableContainer | null {
+        const order = this.collectionProgression;
+        if (!order || order.length === 0) return null;
+        const first = order[0];
+        return first && first.isValid ? first : null;
+    }
+
+    /** Следующая коллекция после очистки типа (по progression) */
+    public getActivateAfter(type: CollectableType): CollectableContainer | null {
+        const order = this.collectionProgression;
+        if (!order || order.length < 2) return null;
+
+        const current = this.getCollection(type);
+        if (!current) return null;
+
+        for (let i = 0; i < order.length - 1; i++) {
+            const entry = order[i];
+            if (entry && entry.isValid && entry === current) {
+                const next = order[i + 1];
+                return next && next.isValid ? next : null;
+            }
+        }
+        return null;
+    }
+
+    // ── Двери (открываются при полном сборе типа) ──────────────────────
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Blue (TYPE_BLUE_CLEARED)' })
+    doorBlue: Node = null!;
+
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Red (TYPE_RED_CLEARED)' })
+    doorRed: Node = null!;
+
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Green (TYPE_GREEN_CLEARED)' })
+    doorGreen: Node = null!;
+
+    @property({ type: Node, group: { name: 'Doors', id: '7' }, tooltip: 'Дверь для Teal (TYPE_TEAL_CLEARED)' })
+    doorTeal: Node = null!;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'Длительность подскока ворот вверх (сек)',
+        min: 0.01,
+    })
+    gateOpenJumpTime: number = 0.15;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'Высота подскока ворот (local Y)',
+        min: 0.01,
+    })
+    gateOpenJumpHeight: number = 1;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'Длительность ускоренного падения ворот вниз (сек)',
+        min: 0.01,
+    })
+    gateOpenFallTime: number = 0.35;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Doors', id: '7' },
+        tooltip: 'На сколько вниз падает View ворот от старта (local Y)',
+        min: 0.01,
+    })
+    gateOpenSlideDistance: number = 6;
+
+    // ── Particles (VFX на сцене) ────────────────────────────────────────
+    @property({ type: ParticleSystem, group: { name: 'Particles', id: '8' }, tooltip: 'Confetti ParticleSystem (one-shot через ParticleService.playConfetti)' })
+    particleConfetti: ParticleSystem = null!;
+
+    @property({
+        type: [ParticleSystem],
+        group: { name: 'Particles', id: '8' },
+        tooltip: 'Коллекция ParticleSystem при росте дыры (HOLE_SIZE_CHANGED вверх) — играют все',
+    })
+    particleSparkles: ParticleSystem[] = [];
 }
 
 // Глобальная ссылка для доступа из скриптов без привязки

@@ -88,6 +88,8 @@
       "scenes": [
         "d961fac3-7728-4a54-a2fa-063df5c6a8fd@ec53b"
       ]
-    }
+    },
+    "dumpMaterials": false,
+    "materialDumpDir": "db://assets/_Game/Models/Materials_Gate"
   }
 }

@@ -1,0 +1,72 @@
+@import "tailwindcss" source(none);
+
+:root {
+  --bg-dark: #0f172a;
+  --panel-bg: #1e293b;
+  --panel-border: #334155;
+  --accent-purple: #8b5cf6;
+  --accent-blue: #3b82f6;
+  --accent-amber: #f59e0b;
+  --accent-green: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: #f8fafc;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* 3D Game Canvas Floor Simulation */
+.wood-floor {
+  background-color: #d2b48c;
+  background-image: 
+    linear-gradient(90deg, rgba(0, 0, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  background-size: 40px 100px;
+}
+
+.hole-3d {
+  background: radial-gradient(circle at 50% 50%, #000000 0%, #1a1a1a 70%, #787878 100%);
+  box-shadow: inset 0 8px 16px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);
+  transform: rotateX(60deg);
+}
+
+/* Glassmorphic Panel */
+.glass-panel {
+  background: rgba(30, 41, 59, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+/* Game HUD Custom Elements */
+.cocos-hud-card {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cocos-hud-card:hover {
+  transform: translateY(-2px) scale(1.03);
+}

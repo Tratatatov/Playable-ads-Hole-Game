@@ -3,7 +3,9 @@
   "general": {
     "designResolution": {
       "width": 1920,
-      "height": 1080
+      "height": 1080,
+      "fitHeight": true,
+      "fitWidth": false
     }
   },
   "physics": {
@@ -26,7 +28,9 @@
       "1": 7,
       "2": 3,
       "3": 9
-    }
+    },
+    "fixedTimeStep": 0.02,
+    "sleepThreshold": 0.4
   },
   "sorting-layer": {
     "layers": [

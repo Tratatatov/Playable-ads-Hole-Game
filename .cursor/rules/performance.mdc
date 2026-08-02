@@ -1,0 +1,34 @@
+---
+description: Zero-GC performance rules for Cocos Creator runtime scripts
+globs: assets/**/*.ts
+alwaysApply: false
+---
+
+# Performance & Zero-GC Rules
+
+## No Allocations in update()
+- STRICTLY FORBIDDEN to create new objects (`new Vec3()`, `new Color()`, `{}`, arrays) inside `update(dt)` or any 60fps handler.
+- All temporary vectors, matrices and calculations MUST use pre-allocated scratch variables declared as class fields.
+
+```typescript
+// ✅ CORRECT — scratch vars pre-allocated
+private readonly _moveDir: Vec3 = new Vec3();
+update(dt: number) {
+    this._moveDir.set(x, 0, z);
+}
+
+// ❌ WRONG — allocation in update
+update(dt: number) {
+    const dir = new Vec3(x, 0, z); // GC spike!
+}
+```
+
+## Object Pooling
+- All repeating 3D objects (collectables, effects, projectiles) MUST be pre-created (prewarm) in `ObjectPool` during `BootState`.
+- FORBIDDEN to call `instantiate()` / `destroy()` during active `GameplayState`.
+- On collection: hide object and return to pool (`pool.release(item)`).
+
+## Bundle Size Budget
+- Final compiled single HTML build must NOT exceed **3 MB**.
+- Textures: max 512×512, compressed PNG/JPG or Procedural Materials.
+- 3D models: low-poly geometry only.

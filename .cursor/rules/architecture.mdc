@@ -1,0 +1,30 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Architecture Rules
+
+## Event System
+- All cross-system interactions MUST go through `EventBus`. No direct hard dependencies between UI and physics components.
+- All EventBus events MUST be strongly typed via enums/interfaces. No `any`.
+
+## Game State Machine (FSM)
+- Game lifecycle is strictly managed by `GameStateMachine`.
+- Allowed transitions: `BootState` → `CameraIntroState` → `TutorialState` → `GameplayState` → `EndGameState`.
+- No chaotic global flags (`isStarted`, `isOver`, `isWin`) outside `GameStore`.
+
+## Bootstrap & Initialization
+- `GameBootstrap` is the single entry point that initializes all services and scene components.
+- Scene components must NOT use standard lifecycle methods (`onLoad`, `start`) for initialization — they have an `init()` method called by the Bootstrapper.
+- Non-scene classes (services, utilities) must be plain TypeScript classes, NOT extend `cc.Component`.
+
+## UI — MVP Pattern
+- All UI implemented with Model-View-Presenter.
+- `View` only handles rendering, receives scene refs via `LevelConfig`.
+- `Presenter` subscribes to `EventBus`, reads `GameStore`, updates `View`.
+- `View` and `Presenter` are plain TS classes initialized in `GameBootstrap`.
+
+## Ad Network Abstraction
+- All store redirects and game-ready signals MUST use `AdNetworkManager.handleClickout()` / `AdNetworkManager.gameReady()`.
+- Never call `mraid.open()` or ad-network APIs directly in game components.

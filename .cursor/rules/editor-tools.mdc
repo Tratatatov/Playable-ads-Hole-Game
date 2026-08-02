@@ -1,0 +1,44 @@
+---
+description: Editor tool conventions for scripts in assets/_Game/Scripts/tools/
+globs: assets/_Game/Scripts/tools/**/*.ts
+alwaysApply: false
+---
+
+# Editor Tools Rules
+
+## Naming
+- All tool scripts MUST have the `Tool` suffix in BOTH the class name and the file name.
+  - ✅ `GridSpawnerTool` in `GridSpawnerTool.ts`
+  - ❌ `GridSpawner` in `GridSpawner.ts`
+
+## Isolation from Main Game Code
+- Tools MUST be strictly isolated from the main game codebase.
+- FORBIDDEN to import or call Tool classes from `GameBootstrap`, services, gameplay, UI presenters, or any runtime code.
+- Tools MUST NOT subscribe to `EventBus`, mutate `GameStore`, or drive the FSM.
+- Tools MAY import gameplay types (e.g. `Collectable`, `CollectableType`) only to configure scene objects in the editor.
+- Main game code MUST NOT depend on tools — sync results (counts, etc.) go through designer-facing configs like `LevelConfig`, not live tool references.
+
+## Runtime Isolation
+- Tools MUST NOT run during gameplay — add this to `onLoad`:
+
+```typescript
+onLoad() {
+    if (!EDITOR) {
+        this.destroy();
+        return;
+    }
+}
+```
+
+## Inspector Button Pattern
+- All main tool functionality MUST be activated via an inspector button using a get/set property:
+
+```typescript
+@property({ tooltip: 'Click to run the tool' })
+public get myActionButton(): boolean { return false; }
+public set myActionButton(v: boolean) {
+    if (v && EDITOR) {
+        this.doSomething();
+    }
+}
+```

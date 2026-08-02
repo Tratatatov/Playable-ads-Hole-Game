@@ -1,0 +1,54 @@
+{
+  "name": "cocos-ui-auto-layout",
+  "version": "1.0.0",
+  "description": "AI-Powered UI Auto-Layout Builder for Cocos Creator 3.x — generates full node trees from JSON or AI Vision output",
+  "author": "UI Auto-Layout Builder",
+  "main": "dist/main.js",
+  "editor": ">=3.6.0",
+  "contributions": {
+    "menu": [
+      {
+        "path": "i18n:menu.panel/UI Auto-Layout",
+        "label": "UI Auto-Layout Builder",
+        "message": "open-panel"
+      }
+    ],
+    "messages": {
+      "open-panel": {
+        "methods": [
+          "openPanel"
+        ]
+      },
+      "build-ui": {
+        "methods": [
+          "buildUI"
+        ]
+      }
+    },
+    "panel": {
+      "default": {
+        "title": "UI Auto-Layout Builder",
+        "type": "dockable",
+        "main": "dist/panel/index.js",
+        "icon": "static/icon.svg",
+        "size": {
+          "min-width": 500,
+          "min-height": 620,
+          "width": 560,
+          "height": 740
+        }
+      }
+    },
+    "scene": {
+      "script": "dist/scene.js"
+    }
+  },
+  "scripts": {
+    "build": "node build.js",
+    "watch": "tsc -w"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^18.0.0"
+  }
+}
