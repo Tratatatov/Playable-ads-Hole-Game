@@ -1,13 +1,14 @@
 /**
  * HoleMovement — логика передвижения дыры.
- * Читает InputService + LevelConfig → целевая velocity → lerp → RigidBody.
- * |v| hard-clamp по holeMaxSpeed.
+ * Читает InputService + LevelConfig (свайп) + GameStore (min/max speed) → velocity → RigidBody.
+ * |v| hard-clamp по GameStore.holeMaxSpeed.
  *
  * Plain TS class (не Component). RULES §2.1: нет аллокаций в update().
  */
 
 import { Node, RigidBody, Vec3, view } from 'cc';
 import { InputService } from './InputService';
+import { GameStore } from './GameStore';
 import { LEVEL_CONFIG } from '../gameplay/LevelConfig';
 
 export class HoleMovement {
@@ -95,8 +96,8 @@ export class HoleMovement {
         const range = Math.max(1e-6, maxPct - minPct);
         const t = Math.min(1, Math.max(0, (offsetMag - minPct) / range));
 
-        const minSpeed = LEVEL_CONFIG.holeMinSpeed;
-        const maxSpeed = Math.max(minSpeed, LEVEL_CONFIG.holeMaxSpeed);
+        const minSpeed = GameStore.holeMinSpeed;
+        const maxSpeed = Math.max(minSpeed, GameStore.holeMaxSpeed);
         const speed = Math.min(maxSpeed, minSpeed + (maxSpeed - minSpeed) * t);
 
         // Unity-style: dir.normalized * speed  →  |v| === speed (и на диагонали тоже)

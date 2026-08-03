@@ -16,6 +16,20 @@ export class HoleSizeThreshold {
 
     @property({ type: CCFloat, tooltip: 'Целевой размер дыры от начального (1 = старт, 1.25 = +25%, 1.5 = +50%)' })
     size: number = 1.25;
+
+    @property({ type: CCFloat, tooltip: 'Целевой holeMinSpeed при этом пороге (абсолютное значение, не % от текущего)' })
+    minSpeed: number = 3;
+
+    @property({ type: CCFloat, tooltip: 'Целевой holeMaxSpeed при этом пороге (абсолютное значение, не % от текущего)' })
+    maxSpeed: number = 18;
+
+    @property({
+        type: CCFloat,
+        tooltip: 'Целевой pitch holeGrowClip при этом пороге (1 = нормальный, абсолютное значение)',
+        range: [0.1, 3, 0.05],
+        slide: true,
+    })
+    growPitch: number = 1;
 }
 
 @ccclass('LevelConfig')
@@ -27,19 +41,22 @@ export class LevelConfig extends Component {
     @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Максимальная физическая скорость дыры (hard clamp |v|). Достигается при свайпе ≥ maxSwipePct; быстрее разогнаться нельзя.' })
     holeMaxSpeed: number = 18;
 
-    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Длительность tween роста дыры (сек). Для пружины лучше 0.5–0.8' })
-    holeScaleTweenDuration: number = 0.55;
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Длительность tween роста дыры (сек). Для нескольких колебаний лучше 0.8–1.5' })
+    holeScaleTweenDuration: number = 1.0;
 
-    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Сила overshoot пружины (≥1). 1.0 ≈ без вылета, 1.2–1.5 — заметный «вырос сильнее → сел»' })
-    holeScaleElasticAmplitude: number = 1.35;
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Сила overshoot пружины (≥1). 1.0 ≈ без вылета, 1.4–1.8 — заметный «вырос сильнее → сел» на мобиле' })
+    holeScaleElasticAmplitude: number = 1.55;
 
-    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Период колебаний пружины. Меньше — чаще дребезг, больше — одно мягкое упругое торможение (0.3–0.5)' })
-    holeScaleElasticPeriod: number = 0.4;
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Период колебаний пружины. Меньше — чаще дребезг, больше — дольше держит overshoot (0.35–0.5)' })
+    holeScaleElasticPeriod: number = 0.42;
+
+    @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость затухания пружины (классика Penner = 10). 4–6 — плавнее и дольше видны колебания на телефоне' })
+    holeScaleElasticDecay: number = 5.5;
 
     @property({ group: { name: 'Hole Settings', id: '1' }, tooltip: 'Скорость сглаживания скорости дыры (выше = резче смена направления, ниже = плавнее)' })
     velocityLerpSpeed: number = 18;
 
-    @property({ type: [HoleSizeThreshold], group: { name: 'Hole Settings', id: '1' }, tooltip: 'Пороги роста дыры: при collectedCount ≥ requiredCount масштаб → size (от начального). Пример: 150 → 1.25, 300 → 1.5' })
+    @property({ type: [HoleSizeThreshold], group: { name: 'Hole Settings', id: '1' }, tooltip: 'Пороги роста: collectedCount ≥ requiredCount → size + абсолютные minSpeed/maxSpeed + growPitch. Пример: 150 → size 1.25, speed 4..12, pitch 1.1' })
     holeSizeThresholds: HoleSizeThreshold[] = [];
 
     // ── Уровень ────────────────────────────────────────────────────────

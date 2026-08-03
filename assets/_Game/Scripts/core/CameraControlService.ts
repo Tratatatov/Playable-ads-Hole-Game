@@ -3,8 +3,8 @@
  * Follow за дырой (world-space hard-lock / smooth damp) + cinematic через tween.
  * Параметры — из CameraConfig.
  *
- *   DOOR_OPENED       → dollyLocalZ (+ опционально) + shake (сильнее).
- *   HOLE_SIZE_CHANGED → лёгкий shake при росте.
+ *   HOLE_SIZE_CHANGED → dollyLocalZ (+ опционально) + лёгкий shake при росте.
+ *   DOOR_OPENED       → shake (сильнее).
  *   PERFECT_MESSAGE   → слабый shake.
  *   Dolly твинит offset и не паузит follow — камера продолжает следовать за целью.
  */
@@ -134,9 +134,6 @@ class CameraControlServiceImpl implements ICameraControlService {
 
     private _onDoorOpened = (_payload: { type: CollectableType }): void => {
         const cfg = this._config;
-        if (!cfg || cfg.dollyOnDoorOpen) {
-            this.dollyLocalZ();
-        }
         if (!cfg || cfg.shakeOnDoorOpen) {
             this.shake(
                 cfg?.doorOpenShakeIntensity ?? 0.18,
@@ -148,6 +145,9 @@ class CameraControlServiceImpl implements ICameraControlService {
     private _onHoleSizeChanged = (payload: { scale: number }): void => {
         if (payload.scale > this._lastHoleScale) {
             const cfg = this._config;
+            if (!cfg || cfg.dollyOnHoleGrow) {
+                this.dollyLocalZ();
+            }
             if (!cfg || cfg.shakeOnHoleGrow) {
                 this.shake(
                     cfg?.holeGrowShakeIntensity ?? 0.1,

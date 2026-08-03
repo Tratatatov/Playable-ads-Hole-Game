@@ -34,11 +34,86 @@ export class AudioConfig extends Component {
     perfectMessageVolume: number = 1;
 
     // ── Pitch (сбор) ───────────────────────────────────────────────────
-    @property({ type: CCFloat, group: { name: 'Collect Pitch', id: '3' }, tooltip: 'Мин. pitch при сборе', range: [0.1, 3, 0.05], slide: true })
+    @property({ type: CCFloat, group: { name: 'Collect Pitch', id: '3' }, tooltip: 'Мин. pitch при сборе (и база streak-режима)', range: [0.1, 3, 0.05], slide: true })
     collectPitchMin: number = 0.95;
 
-    @property({ type: CCFloat, group: { name: 'Collect Pitch', id: '3' }, tooltip: 'Макс. pitch при сборе', range: [0.1, 3, 0.05], slide: true })
-    collectPitchMax: number = 1.08;
+    @property({ type: CCFloat, group: { name: 'Collect Pitch', id: '3' }, tooltip: 'Макс. pitch при сборе (и потолок streak-режима). Для streak нужен запас: Max − Min ≫ Step', range: [0.1, 3, 0.05], slide: true })
+    collectPitchMax: number = 1.8;
+
+    @property({
+        group: { name: 'Collect Pitch', id: '3' },
+        tooltip:
+            'Streak: каждый ITEM_COLLECTED поднимает pitch на step (от текущей базы). ' +
+            'При росте дыры streak сбрасывается, но база ↑ на Grow Boost. Выкл. → random Min..Max.',
+    })
+    collectPitchStreakEnabled: boolean = false;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Collect Pitch', id: '3' },
+        tooltip: 'Шаг pitch за сбор внутри streak. Пример: Base=1, Step=0.05',
+        range: [0, 0.5, 0.005],
+        slide: true,
+    })
+    collectPitchStreakStep: number = 0.05;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Collect Pitch', id: '3' },
+        tooltip:
+            'Насколько поднять стартовый (базовый) pitch сбора при каждом росте дыры. ' +
+            'Streak сбрасывается, база остаётся выше. 0 = только сброс streak.',
+        range: [0, 1, 0.01],
+        slide: true,
+    })
+    collectPitchGrowBoost: number = 0.08;
+
+    // ── Pitch (ворота) ─────────────────────────────────────────────────
+    @property({
+        type: CCFloat,
+        group: { name: 'Door Pitch', id: '6' },
+        tooltip: 'Pitch первого открытия ворот (DOOR_OPENED)',
+        range: [0.1, 3, 0.05],
+        slide: true,
+    })
+    doorOpenPitchMin: number = 1;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Door Pitch', id: '6' },
+        tooltip: 'Потолок pitch при открытии ворот',
+        range: [0.1, 3, 0.05],
+        slide: true,
+    })
+    doorOpenPitchMax: number = 1.6;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Door Pitch', id: '6' },
+        tooltip: 'На сколько ↑ pitch за каждые следующие ворота. 0 = всегда Min',
+        range: [0, 1, 0.01],
+        slide: true,
+    })
+    doorOpenPitchStep: number = 0.12;
+
+    // ── Pitch (Perfect Message) ────────────────────────────────────────
+    @property({
+        type: CCFloat,
+        group: { name: 'Perfect Pitch', id: '5' },
+        tooltip: 'Мин. pitch PerfectMessage (PERFECT_MESSAGE)',
+        range: [0.1, 3, 0.05],
+        slide: true,
+    })
+    perfectMessagePitchMin: number = 0.95;
+
+    @property({
+        type: CCFloat,
+        group: { name: 'Perfect Pitch', id: '5' },
+        tooltip: 'Макс. pitch PerfectMessage (PERFECT_MESSAGE)',
+        range: [0.1, 3, 0.05],
+        slide: true,
+    })
+    perfectMessagePitchMax: number = 1.08;
 
     // ── Collect pool / anti-mud ─────────────────────────────────────────
     @property({

@@ -4,7 +4,8 @@
  *   - HoleMovement → движение по арене
  *   - Trigger-коллизии с Collectable → поглощение
  *   - Collision с Gates (solid) → GATE_TOUCHED → CrossSprite
- *   - Рост: HoleGrowthService твинит scale (см. сервис)
+ *   - Рост: HoleGrowthService твинит scale только на growthViewNode;
+ *     body-коллайдер на этом же node масштабируется отдельно (XZ)
  *
  * RULES §2.1: Все scratch-переменные преаллоцированы, нет new Vec3() в update().
  */
@@ -29,6 +30,12 @@ export class HoleController extends Component {
 
     @property({ type: Collider, tooltip: 'Коллайдер-триггер для поглощения предметов (если не указан, ищется на текущем узле)' })
     absorbTrigger: Collider | null = null;
+
+    @property({
+        type: CCNode,
+        tooltip: 'Визуал дыры — пружинный tween роста (absorbTrigger под ним растёт иерархией; body-коллайдер на корне — через HoleGrowthService)',
+    })
+    growthViewNode: CCNode | null = null;
 
     /** Солидный коллайдер дыры (не trigger) — для удара о закрытые ворота. */
     private _solidCollider: Collider | null = null;

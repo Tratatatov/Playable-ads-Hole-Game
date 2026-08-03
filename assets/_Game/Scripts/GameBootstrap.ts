@@ -10,7 +10,7 @@
  * RULES §1.2: Жизненный цикл строго инкапсулирован в FSM.
  */
 
-import { _decorator, Component, Node } from 'cc';
+import { _decorator, Component, Node, Collider } from 'cc';
 import { EventBus, GameEvent } from './core/EventBus';
 import { GameStateMachine, GameState } from './core/GameStateMachine';
 import { GameStore } from './core/GameStore';
@@ -133,7 +133,13 @@ export class GameBootstrap extends Component {
             console.warn('[GameBootstrap] UIMessagesConfig не назначен — UI-сообщения отключены');
         }
         if (this.holeController) {
-            HoleGrowthService.init(this.holeController.node);
+            const viewNode = this.holeController.growthViewNode ?? this.holeController.node;
+            if (!this.holeController.growthViewNode) {
+                console.warn('[GameBootstrap] HoleController.growthViewNode не назначен — tween на корне');
+            }
+            // Body-коллайдер на корне HoleController (не absorbTrigger под growthView)
+            const bodyCollider = this.holeController.getComponent(Collider);
+            HoleGrowthService.init(viewNode, bodyCollider);
         } else {
             console.warn('[GameBootstrap] HoleController не назначен — HoleGrowthService без tween scale');
         }

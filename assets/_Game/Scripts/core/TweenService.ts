@@ -16,6 +16,11 @@ export interface HoleScaleSpringTweenConfig {
     amplitude: number;
     /** Период колебаний пружины. */
     period: number;
+    /**
+     * Скорость экспоненциального затухания (классический Penner = 10).
+     * Меньше → дольше видны overshoot и последующие колебания.
+     */
+    decay: number;
 }
 
 /** Параметры elastic punch scale для UI-карточек. */
@@ -103,6 +108,7 @@ class TweenServiceImpl implements ITweenService {
     private _holeScaleTween: Tween<Node> | null = null;
     private _holeElasticAmp: number = 1.35;
     private _holeElasticPeriod: number = 0.4;
+    private _holeElasticDecay: number = 5.5;
 
     private readonly _uiBaseScale: Vec3 = new Vec3(1, 1, 1);
     private readonly _uiPunchScale: Vec3 = new Vec3(1, 1, 1);
@@ -142,6 +148,7 @@ class TweenServiceImpl implements ITweenService {
 
         this._holeElasticAmp = Math.max(1, config.amplitude);
         this._holeElasticPeriod = Math.max(0.05, config.period);
+        this._holeElasticDecay = Math.max(1, config.decay);
         const duration = Math.max(0.01, config.duration);
 
         this._holeScaleTween = tween(node)
@@ -277,13 +284,14 @@ class TweenServiceImpl implements ITweenService {
         if (done) done();
     }
 
-    /** Затухающая пружина (Penner elasticOut) для дыры. */
+    /** Затухающая пружина (Penner elasticOut) для дыры — decay настраиваемый. */
     private readonly _holeSpringOut = (k: number): number => {
         if (k === 0 || k === 1) return k;
         const a = this._holeElasticAmp;
         const p = this._holeElasticPeriod;
+        const d = this._holeElasticDecay;
         const s = p * Math.asin(1 / a) / (2 * Math.PI);
-        return a * Math.pow(2, -10 * k) * Math.sin((k - s) * (2 * Math.PI) / p) + 1;
+        return a * Math.pow(2, -d * k) * Math.sin((k - s) * (2 * Math.PI) / p) + 1;
     };
 
     /** Затухающая пружина (Penner elasticOut) для UI punch. */

@@ -120,12 +120,13 @@ export class CameraConfig extends Component {
     })
     perfectShakeDuration: number = 0.2;
 
-    // ── Отдаление при открытии ворот (DOOR_OPENED) ─────────────────────
+    // ── Отдаление при росте дыры (HOLE_SIZE_CHANGED вверх) ─────────────
     @property({
         group: { name: 'Отдаление', id: '3' },
-        tooltip: 'Отдавать камеру при каждом DOOR_OPENED (полное очищение типа → ворота)',
+        tooltip: 'Отдавать камеру при каждом росте дыры (HOLE_SIZE_CHANGED вверх)',
+        formerlySerializedAs: 'dollyOnDoorOpen',
     })
-    dollyOnDoorOpen: boolean = true;
+    dollyOnHoleGrow: boolean = true;
 
     @property({
         type: CCFloat,

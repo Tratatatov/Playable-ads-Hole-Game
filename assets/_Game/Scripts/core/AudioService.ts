@@ -2,21 +2,21 @@
  * AudioService — воспроизведение SFX по событиям EventBus.
  * Клипы берутся из AudioConfig. Подписки только через события (не прямые вызовы из геймплея).
  *
- *   ITEM_COLLECTED      → collectClip (voice pool + pitch + anti-mud)
- *   HOLE_SIZE_CHANGED   → holeGrowClip (только при росте scale)
- *   DOOR_OPENED         → doorOpenClip
- *   PERFECT_MESSAGE     → perfectMessageClip
+ *   ITEM_COLLECTED      → collectClip (random pitch ИЛИ streak ↑) via WebAudio
+ *   HOLE_SIZE_CHANGED   → holeGrowClip + сброс streak + подъём базы сбора (Grow Boost)
+ *   DOOR_OPENED         → doorOpenClip (pitch ↑ за каждые новые ворота) via WebAudio
+ *   PERFECT_MESSAGE     → perfectMessageClip (random pitch range) via WebAudio
  *   FIRST_TOUCH / жест  → unlock WebAudio (мобильный autoplay policy)
  *
- * Collect pool: idle-first; если все заняты — drop (без stop/click), не режем хвост.
+ * Pitch через PitchSfxPlayer: Cocos 3.8 AudioSource не имеет playbackRate.
  */
 
 import { AudioClip, AudioSource, game } from 'cc';
 import { EventBus, GameEvent } from './EventBus';
+import { GameStore } from './GameStore';
 import { CollectableType } from '../gameplay/Collectable';
 import { AudioConfig } from './AudioConfig';
-
-const DEFAULT_COLLECT_POOL = 8;
+import { PitchSfxPlayer } from './PitchSfxPlayer';
 
 export interface IAudioService {
     init(config: AudioConfig): void;
@@ -28,11 +28,16 @@ export interface IAudioService {
 class AudioServiceImpl implements IAudioService {
     private _config: AudioConfig | null = null;
     private _source: AudioSource | null = null;
-    private readonly _collectPool: AudioSource[] = [];
-    private _collectScan: number = 0;
+    private readonly _pitch: PitchSfxPlayer = new PitchSfxPlayer();
     private _subscribed: boolean = false;
     private _lastHoleScale: number = 1;
     private _lastCollectTime: number = -1e9;
+    /** Индекс streak внутри текущей фазы (сброс при росте). */
+    private _collectPitchStreak: number = 0;
+    /** Текущая база сбора; ↑ на Grow Boost при каждом росте дыры. */
+    private _collectPitchBase: number = 1;
+    /** Сколько ворот уже открыто (для door pitch step). */
+    private _doorOpenCount: number = 0;
     private _unlocked: boolean = false;
     private _gestureUnlockInstalled: boolean = false;
 
@@ -48,43 +53,51 @@ class AudioServiceImpl implements IAudioService {
 
         this._config = config;
         this._lastHoleScale = 1;
-        this._collectScan = 0;
         this._lastCollectTime = -1e9;
+        this._collectPitchStreak = 0;
+        this._collectPitchBase = config.collectPitchMin;
+        this._doorOpenCount = 0;
         this._unlocked = false;
-        this._collectPool.length = 0;
 
-        // Основной AudioSource (дыра / двери / perfect + silent unlock)
+        // Основной AudioSource (door + silent unlock fallback)
         this._source = config.node.getComponent(AudioSource);
         if (!this._source) {
             this._source = config.node.addComponent(AudioSource);
         }
         this._source.playOnAwake = false;
 
-        const poolSize = Math.max(2, Math.min(16, config.collectPoolSize | 0 || DEFAULT_COLLECT_POOL));
-        for (let i = 0; i < poolSize; i++) {
-            const src = config.node.addComponent(AudioSource);
-            src.playOnAwake = false;
-            src.loop = false;
-            if (config.collectClip) {
-                src.clip = config.collectClip;
-            }
-            this._collectPool.push(src);
-        }
+        this._pitch.warm(config.collectClip);
+        this._pitch.warm(config.holeGrowClip);
+        this._pitch.warm(config.doorOpenClip);
+        this._pitch.warm(config.perfectMessageClip);
 
         if (!this._subscribed) {
             EventBus.on(GameEvent.ITEM_COLLECTED, this._onItemCollected, this);
             EventBus.on(GameEvent.HOLE_SIZE_CHANGED, this._onHoleSizeChanged, this);
             EventBus.on(GameEvent.DOOR_OPENED, this._onDoorOpened, this);
             EventBus.on(GameEvent.PERFECT_MESSAGE, this._onPerfectMessage, this);
-            // FIRST_TOUCH всё ещё в user-gesture call stack
             EventBus.on(GameEvent.FIRST_TOUCH, this._onFirstTouch, this);
             this._subscribed = true;
         }
 
         this._installGestureUnlock();
 
+        if (config.collectPitchStreakEnabled) {
+            const span = Math.abs(config.collectPitchMax - config.collectPitchMin);
+            const step = Math.max(0, config.collectPitchStreakStep);
+            const steps = step > 0 ? Math.floor(span / step) : 0;
+            if (steps < 3) {
+                console.warn(
+                    `[AudioService] Collect streak почти не слышен: ` +
+                    `Min=${config.collectPitchMin}, Max=${config.collectPitchMax}, Step=${step} ` +
+                    `(~${steps} ступеней). Увеличь Max или уменьши Step.`
+                );
+            }
+        }
+
         console.log(
-            `[AudioService] init: collectPool=${poolSize}, ` +
+            `[AudioService] init: pitch via WebAudio, ` +
+            `streak=${config.collectPitchStreakEnabled}, ` +
             `minInterval=${config.collectMinInterval}s, ` +
             `stackAtten=${config.collectStackAttenuation}`
         );
@@ -92,12 +105,13 @@ class AudioServiceImpl implements IAudioService {
 
     unlock(): void {
         this._resumeWebAudioContexts();
+        this._pitch.unlock();
 
         if (this._unlocked) return;
         this._unlocked = true;
         this._removeGestureUnlock();
 
-        // Silent play внутри gesture — iOS стартует WebAudio timeline
+        // Silent play внутри gesture — iOS / DOM fallback
         const clip =
             this._config?.collectClip ??
             this._config?.doorOpenClip ??
@@ -121,12 +135,14 @@ class AudioServiceImpl implements IAudioService {
             EventBus.off(GameEvent.FIRST_TOUCH, this._onFirstTouch, this);
             this._subscribed = false;
         }
+        this._pitch.destroy();
         this._config = null;
         this._source = null;
-        this._collectPool.length = 0;
-        this._collectScan = 0;
         this._lastHoleScale = 1;
         this._lastCollectTime = -1e9;
+        this._collectPitchStreak = 0;
+        this._collectPitchBase = 1;
+        this._doorOpenCount = 0;
         this._unlocked = false;
     }
 
@@ -143,27 +159,45 @@ class AudioServiceImpl implements IAudioService {
     private _onHoleSizeChanged = (payload: { scale: number }): void => {
         if (!this._config) return;
         if (payload.scale > this._lastHoleScale) {
+            this._onHoleGrew();
             this._resumeWebAudioContexts();
-            this._playOneShot(this._config.holeGrowClip, this._config.holeGrowVolume);
+            this._pitch.play(
+                this._config.holeGrowClip,
+                this._config.holeGrowVolume,
+                GameStore.holeGrowPitch
+            );
         }
         this._lastHoleScale = payload.scale;
     };
 
+    /** Streak → 0, база сбора ↑ на Grow Boost (clamp Max). */
+    private _onHoleGrew(): void {
+        const config = this._config;
+        if (!config || !config.collectPitchStreakEnabled) {
+            this._collectPitchStreak = 0;
+            return;
+        }
+        this._collectPitchStreak = 0;
+        const min = config.collectPitchMin;
+        const max = config.collectPitchMax;
+        const lo = min < max ? min : max;
+        const hi = min < max ? max : min;
+        const boost = Math.max(0, config.collectPitchGrowBoost);
+        this._collectPitchBase = Math.min(hi, Math.max(lo, this._collectPitchBase) + boost);
+    }
+
     private _onDoorOpened = (_payload: { type: CollectableType }): void => {
         if (!this._config) return;
         this._resumeWebAudioContexts();
-        this._playOneShot(this._config.doorOpenClip, this._config.doorOpenVolume);
+        this._playDoorOpen();
     };
 
     private _onPerfectMessage = (): void => {
         if (!this._config) return;
         this._resumeWebAudioContexts();
-        this._playOneShot(this._config.perfectMessageClip, this._config.perfectMessageVolume);
+        this._playPerfectMessage();
     };
 
-    /**
-     * Тач во время CameraIntro (InputService ещё выкл.) тоже должен unlock'ать звук.
-     */
     private _installGestureUnlock(): void {
         if (this._gestureUnlockInstalled) return;
         this._gestureUnlockInstalled = true;
@@ -190,19 +224,12 @@ class AudioServiceImpl implements IAudioService {
         canvas.removeEventListener('pointerdown', this._onCanvasUnlock);
     }
 
-    /** Resume suspended AudioContext (iOS / WebView / tab return). */
     private _resumeWebAudioContexts(): void {
+        this._pitch.resume();
+
         const g = globalThis as unknown as Record<string, unknown>;
         this._tryResumeCtx(g['__audioContext']);
         this._tryResumeCtx(g['audioContext']);
-
-        // Cocos / bundlers иногда кладут ctx на webkitAudioContext instances
-        const w = globalThis as unknown as {
-            AudioContext?: new () => { state: string; resume: () => Promise<void> };
-            webkitAudioContext?: new () => { state: string; resume: () => Promise<void> };
-        };
-        // Не создаём новый контекст — только resume уже существующих через silent play.
-        void w;
     }
 
     private _tryResumeCtx(ctx: unknown): void {
@@ -224,8 +251,22 @@ class AudioServiceImpl implements IAudioService {
         const config = this._config;
         if (!config) return;
         const clip = config.collectClip;
-        const pool = this._collectPool;
-        if (!clip || pool.length === 0) return;
+        if (!clip) return;
+
+        const min = config.collectPitchMin;
+        const max = config.collectPitchMax;
+        const lo = min < max ? min : max;
+        const hi = min < max ? max : min;
+
+        let pitch: number;
+        if (config.collectPitchStreakEnabled) {
+            const step = Math.max(0, config.collectPitchStreakStep);
+            const base = Math.min(hi, Math.max(lo, this._collectPitchBase));
+            pitch = Math.min(hi, base + this._collectPitchStreak * step);
+            this._collectPitchStreak++;
+        } else {
+            pitch = lo + Math.random() * (hi - lo);
+        }
 
         const now = performance.now() * 0.001;
         const minInterval = Math.max(0, config.collectMinInterval);
@@ -233,64 +274,45 @@ class AudioServiceImpl implements IAudioService {
             return;
         }
 
-        const src = this._acquireCollectVoice();
-        if (!src) {
-            return;
-        }
-
-        const min = config.collectPitchMin;
-        const max = config.collectPitchMax;
-        const lo = min < max ? min : max;
-        const hi = min < max ? max : min;
-        const pitch = lo + Math.random() * (hi - lo);
-
-        const active = this._countPlayingCollect();
+        const active = this._pitch.collectActive;
         const atten = Math.max(0, config.collectStackAttenuation);
         const volScale = atten > 0 ? 1 / (1 + atten * active) : 1;
         const volume = Math.max(0, Math.min(1, config.collectVolume * volScale));
 
-        if (src.clip !== clip) {
-            src.clip = clip;
-        }
-        src.loop = false;
-        src.volume = volume;
-        src.playbackRate = pitch;
-        src.play();
-
+        this._pitch.playCollect(clip, volume, pitch);
         this._lastCollectTime = now;
     }
 
-    private _acquireCollectVoice(): AudioSource | null {
-        const pool = this._collectPool;
-        const n = pool.length;
-        if (n === 0) return null;
+    private _playDoorOpen(): void {
+        const config = this._config;
+        if (!config) return;
 
-        const start = this._collectScan % n;
-        for (let k = 0; k < n; k++) {
-            const i = (start + k) % n;
-            const src = pool[i];
-            if (!src || !src.isValid) continue;
-            if (!src.playing) {
-                this._collectScan = (i + 1) % n;
-                return src;
-            }
-        }
-        return null;
+        const min = config.doorOpenPitchMin;
+        const max = config.doorOpenPitchMax;
+        const lo = min < max ? min : max;
+        const hi = min < max ? max : min;
+        const step = Math.max(0, config.doorOpenPitchStep);
+        const pitch = Math.min(hi, lo + this._doorOpenCount * step);
+        this._doorOpenCount++;
+
+        this._pitch.play(config.doorOpenClip, config.doorOpenVolume, pitch);
     }
 
-    private _countPlayingCollect(): number {
-        const pool = this._collectPool;
-        let n = 0;
-        for (let i = 0; i < pool.length; i++) {
-            const src = pool[i];
-            if (src && src.isValid && src.playing) n++;
-        }
-        return n;
-    }
+    private _playPerfectMessage(): void {
+        const config = this._config;
+        if (!config) return;
 
-    private _playOneShot(clip: AudioClip | null, volume: number): void {
-        if (!clip || !this._source) return;
-        this._source.playOneShot(clip, volume);
+        const min = config.perfectMessagePitchMin;
+        const max = config.perfectMessagePitchMax;
+        const lo = min < max ? min : max;
+        const hi = min < max ? max : min;
+        const pitch = lo + Math.random() * (hi - lo);
+
+        this._pitch.play(
+            config.perfectMessageClip,
+            config.perfectMessageVolume,
+            pitch
+        );
     }
 }
 

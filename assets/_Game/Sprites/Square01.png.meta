@@ -39,7 +39,7 @@
     "hasAlpha": true,
     "redirect": "6ac466b7-94a0-42d9-99b9-d26077984287@6c48a",
     "compressSettings": {
-      "useCompressTexture": true
+      "useCompressTexture": false
     }
   }
 }

@@ -29,8 +29,11 @@
       "2": 3,
       "3": 9
     },
-    "fixedTimeStep": 0.02,
-    "sleepThreshold": 0.4
+    "fixedTimeStep": 0.015,
+    "sleepThreshold": 0.4,
+    "gravity": {
+      "y": -15
+    }
   },
   "sorting-layer": {
     "layers": [

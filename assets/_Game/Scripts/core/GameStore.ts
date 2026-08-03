@@ -1,6 +1,6 @@
 /**
  * GameStore — единственное хранилище игрового состояния.
- * Только этот класс мутирует score, holeScale, timeLeft, collectedCount.
+ * Только этот класс мутирует score, holeScale, speeds, growPitch, timeLeft, collectedCount.
  * Запрещены глобальные флаги вне этого класса (RULES §1.2).
  */
 
@@ -11,12 +11,20 @@ import { CollectableType } from '../gameplay/Collectable';
 export interface IGameStore {
     readonly score: number;
     readonly holeScale: number;
+    readonly holeMinSpeed: number;
+    readonly holeMaxSpeed: number;
+    /** Абсолютный pitch holeGrowClip для текущего порога (1 = норма). */
+    readonly holeGrowPitch: number;
     readonly timeLeft: number;
     readonly collectedCount: number;
     readonly remainingCounts: Record<CollectableType, number>;
     reset(): void;
     addScore(delta: number): void;
     setHoleScale(scale: number): void;
+    /** Абсолютные min/max скорости дыры (не дельта %). */
+    setHoleSpeeds(minSpeed: number, maxSpeed: number): void;
+    /** Абсолютный pitch holeGrowClip (не дельта %). */
+    setHoleGrowPitch(pitch: number): void;
     collectItem(type: CollectableType, scoreValue: number): void;
     setInitialCollectables(counts: Record<CollectableType, number>): void;
     setTimeLeft(t: number): void;
@@ -25,6 +33,9 @@ export interface IGameStore {
 class GameStoreImpl implements IGameStore {
     private _score:      number = 0;
     private _holeScale:  number = 1;
+    private _holeMinSpeed: number = 3;
+    private _holeMaxSpeed: number = 18;
+    private _holeGrowPitch: number = 1;
     private _timeLeft:   number = 0;
     private _collectedCount: number = 0;
     private _remainingCounts: Record<CollectableType, number> = {
@@ -44,6 +55,9 @@ class GameStoreImpl implements IGameStore {
 
     get score():     number { return this._score; }
     get holeScale(): number { return this._holeScale; }
+    get holeMinSpeed(): number { return this._holeMinSpeed; }
+    get holeMaxSpeed(): number { return this._holeMaxSpeed; }
+    get holeGrowPitch(): number { return this._holeGrowPitch; }
     get timeLeft():  number { return this._timeLeft; }
     get collectedCount(): number { return this._collectedCount; }
     get remainingCounts(): Record<CollectableType, number> { return this._remainingCounts; }
@@ -51,6 +65,9 @@ class GameStoreImpl implements IGameStore {
     reset(): void {
         this._score     = 0;
         this._holeScale = 1;
+        this._holeMinSpeed = LEVEL_CONFIG ? LEVEL_CONFIG.holeMinSpeed : 3;
+        this._holeMaxSpeed = LEVEL_CONFIG ? Math.max(this._holeMinSpeed, LEVEL_CONFIG.holeMaxSpeed) : 18;
+        this._holeGrowPitch = 1;
         this._timeLeft  = LEVEL_CONFIG.totalTime;
         this._collectedCount = 0;
         this._remainingCounts[CollectableType.Blue] = 0;
@@ -114,6 +131,20 @@ class GameStoreImpl implements IGameStore {
         this._holeScale = scale;
         this._holeScalePayload.scale = this._holeScale;
         EventBus.emit(GameEvent.HOLE_SIZE_CHANGED, this._holeScalePayload);
+    }
+
+    setHoleSpeeds(minSpeed: number, maxSpeed: number): void {
+        const min = Math.max(0, minSpeed);
+        const max = Math.max(min, maxSpeed);
+        if (this._holeMinSpeed === min && this._holeMaxSpeed === max) return;
+        this._holeMinSpeed = min;
+        this._holeMaxSpeed = max;
+    }
+
+    setHoleGrowPitch(pitch: number): void {
+        const p = Math.max(0.1, pitch);
+        if (this._holeGrowPitch === p) return;
+        this._holeGrowPitch = p;
     }
 
     setTimeLeft(t: number): void {
